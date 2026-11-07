@@ -1,0 +1,52 @@
+import { z } from "zod";
+
+/**
+ * All environment variables, checked once on first use.
+ * If one is missing, the error names it so you know what to paste in Vercel / .env.local.
+ */
+const schema = z.object({
+  // Meta WhatsApp Cloud API
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1),
+  WHATSAPP_APP_SECRET: z.string().min(1),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(8),
+  WHATSAPP_API_VERSION: z.string().default("v23.0"),
+  // "true" = log replies instead of sending them (local testing without Meta)
+  WHATSAPP_DRY_RUN: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+
+  // Supabase
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+
+  // Claude
+  ANTHROPIC_API_KEY: z.string().min(1),
+  CLAUDE_CHAT_MODEL: z.string().default("claude-haiku-5-5"),
+  CLAUDE_VISION_MODEL: z.string().default("claude-opus-5-5"),
+
+  // Stripe (milestone 3, optional for now)
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRICE_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_YEARLY: z.string().optional(),
+
+  // Vercel Cron (milestone 4, optional for now)
+  CRON_SECRET: z.string().optional(),
+});
+
+export type Env = z.infer<typeof schema>;
+
+let cached: Env | undefined;
+
+export function getEnv(): Env {
+  if (cached) return cached;
+  const parsed = schema.safeParse(process.env);
+  if (!parsed.success) {
+    const missing = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
+    throw new Error(`Missing or invalid environment variables: ${missing}. See docs/SETUP.md`);
+  }
+  cached = parsed.data;
+  return cached;
+}
