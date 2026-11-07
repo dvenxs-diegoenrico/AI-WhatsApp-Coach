@@ -18,7 +18,9 @@ describe("parseWebhook", () => {
       { id: "m1", from: "5215512345678", timestamp: "1", type: "text", text: { body: "Hola A" } },
       { id: "m2", from: "5215512345678", timestamp: "2", type: "image", image: { id: "img1", mime_type: "image/jpeg", caption: "mi comida" } },
       { id: "m3", from: "5215512345678", timestamp: "3", type: "audio", audio: { id: "aud1", mime_type: "audio/ogg; codecs=opus" } },
-      { id: "m4", from: "5215512345678", timestamp: "4", type: "sticker", sticker: { id: "s" } },
+      { id: "m4", from: "5215512345678", timestamp: "4", type: "location", location: {} },
+      { id: "m5", from: "5215512345678", timestamp: "5", type: "sticker", sticker: { id: "s" } },
+      { id: "m6", from: "5215512345678", timestamp: "6", type: "reaction", reaction: { emoji: "👍" } },
     ]), "123");
     expect(out.map((m) => m.kind)).toEqual(["text", "image", "audio", "other"]);
     expect(out[0]).toMatchObject({ text: "Hola A", name: "Ana" });

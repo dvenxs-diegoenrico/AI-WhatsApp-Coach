@@ -48,14 +48,13 @@ export async function POST(req: NextRequest) {
 
   const messages = parseWebhook(payload, env.WHATSAPP_PHONE_NUMBER_ID);
   if (messages.length > 0) {
+    // In parallel: when Meta batches several messages, each is stored right away,
+    // so the short reply delay can group them into a single answer.
     after(async () => {
-      for (const msg of messages) {
-        try {
-          await handleIncoming(msg);
-        } catch (err) {
-          console.error(`Failed to handle WhatsApp message ${msg.id}`, err);
-        }
-      }
+      const results = await Promise.allSettled(messages.map((msg) => handleIncoming(msg)));
+      results.forEach((r, i) => {
+        if (r.status === "rejected") console.error(`Failed to handle WhatsApp message ${messages[i].id}`, r.reason);
+      });
     });
   }
 
