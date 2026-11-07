@@ -24,7 +24,15 @@ const schema = z.object({
   // Claude
   ANTHROPIC_API_KEY: z.string().min(1),
   CLAUDE_CHAT_MODEL: z.string().default("claude-haiku-5-5"),
-  CLAUDE_VISION_MODEL: z.string().default("claude-opus-5-5"),
+  // Sonnet 5.5 costs about half of Opus 5.5 per photo. Switch back to claude-opus-5-5 if estimates look worse.
+  CLAUDE_VISION_MODEL: z.string().default("claude-sonnet-5-5"),
+  CLAUDE_VISION_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
+
+  // Fair-use limits per user, rolling 24 h (counts messages the user sends).
+  DAILY_MESSAGE_LIMIT: z.coerce.number().int().positive().default(60),
+  DAILY_PHOTO_LIMIT: z.coerce.number().int().positive().default(5),
+  // Wait this long after a text before answering, so 3 quick messages get 1 reply (1 WhatsApp charge).
+  REPLY_DEBOUNCE_MS: z.coerce.number().int().min(0).max(15000).default(3000),
 
   // Stripe (milestone 3, optional for now)
   STRIPE_SECRET_KEY: z.string().optional(),

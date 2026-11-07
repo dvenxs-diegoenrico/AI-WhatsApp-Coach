@@ -3,21 +3,26 @@ import { db, PHOTOS_BUCKET } from "@/lib/supabase/server";
 import type { MessageRow, RiskFlag, UserRow } from "@/lib/supabase/types";
 import type { IncomingMessage } from "@/lib/whatsapp/parse";
 import { downloadMedia, markReadWithTyping, sendText } from "@/lib/whatsapp/client";
-import { chatReply, photoReply, transcribeAudio, type AiReply, type ImageMediaType } from "@/lib/ai/claude";
+import { chatReply, photoReply, transcribeAudio, type AiReply, type ChatTurn } from "@/lib/ai/claude";
+import { prepareImage } from "@/lib/ai/image";
+import { addCosts, type Cost } from "@/lib/ai/pricing";
 import { buildSystemPrompt, PHOTO_INSTRUCTIONS, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
 import { screenMessage } from "@/lib/safety/screening";
 import { filterReply, labelAsEstimate } from "@/lib/safety/output-filter";
 import { t } from "@/lib/i18n/es";
 import { countryFromWaId, DEFAULT_TIMEZONE } from "@/lib/i18n/countries";
+import { getEnv } from "@/lib/env";
 import { parseAudienceCode } from "./audience";
 import { detectCommand, DELETE_CONFIRM_WINDOW_MS } from "./commands";
 import { currentQuestion, runOnboarding } from "./onboarding";
+import { LIMIT_WINDOW_MS, limitState, shouldNotify } from "./limits";
 
-const HISTORY_LIMIT = 16;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const IMAGE_TYPES: ImageMediaType[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+/** Messages of context sent with a text question (fewer = cheaper; 10 is enough for a WhatsApp chat). */
+const CHAT_HISTORY = 10;
+/** Messages of context sent with a photo (the photo itself is the main input). */
+const PHOTO_HISTORY = 4;
 
-type ChatTurn = { role: "user" | "assistant"; content: string };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
 // Entry point: one incoming WhatsApp message
@@ -25,7 +30,6 @@ type ChatTurn = { role: "user" | "assistant"; content: string };
 export async function handleIncoming(msg: IncomingMessage): Promise<void> {
   const found = await findOrCreateUser(msg);
   let user = found.user;
-  const isNew = found.isNew;
 
   // Store the inbound message first. Meta retries webhooks, so a duplicate id means "already handled".
   const stored = await storeInbound(user, msg);
@@ -33,10 +37,11 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
 
   void markReadWithTyping(msg.id);
   await db().from("users").update({ last_inbound_at: new Date().toISOString() }).eq("id", user.id);
+  const country = countryFromWaId(user.wa_id);
 
-  if (isNew) {
-    if (msg.kind === "text" && screenMessage(msg.text).crisis) await reply(user, t.crisis(countryFromWaId(user.wa_id)));
-    await reply(user, t.welcome);
+  if (found.isNew) {
+    const crisis = msg.kind === "text" && screenMessage(msg.text).crisis;
+    await reply(user, crisis ? `${t.crisis(country)}\n\n${t.welcome}` : t.welcome);
     return;
   }
 
@@ -48,15 +53,16 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
       await reply(user, t.audioNotSupportedYet);
       return;
     }
+    await db().from("messages").update({ body: text }).eq("id", stored.id); // history shows the transcript
   }
 
   // Crisis language gets a fixed, safe answer for everyone, before anything else.
   if (text && screenMessage(text).crisis) {
-    await reply(user, t.crisis(countryFromWaId(user.wa_id)));
+    await reply(user, t.crisis(country));
     return;
   }
 
-  // Commands work at any step.
+  // Commands work at any step, and are never blocked by limits.
   const command = text ? detectCommand(text) : null;
   if (command === "delete_request") {
     await db().from("users").update({ pending_deletion_at: new Date().toISOString() }).eq("id", user.id);
@@ -95,48 +101,105 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
       if (error) throw new Error(`onboarding update failed: ${error.message}`);
     }
     if (result.purgeMessages) await db().from("messages").delete().eq("user_id", user.id);
-    await reply(user, result.reply, null, result.purgeMessages);
+    await reply(user, result.reply, { skipStore: result.purgeMessages });
     return;
   }
 
+  if (msg.kind === "other") {
+    await reply(user, t.unsupportedType);
+    return;
+  }
+
+  // Fair-use limits (rolling 24 h). Past the limit we answer once, then stay quiet: every reply costs money.
+  if (!(await withinLimits(user, msg.kind === "image"))) return;
+
+  // Safety screening on what the user wrote. A first-time flag adds a notice to the same reply (1 message, not 2).
+  const screened = await applyScreening(user, msg.kind === "image" ? msg.caption : text);
+  user = screened.user;
+
   if (msg.kind === "image") {
-    await handlePhoto(user, msg, stored);
+    await handlePhoto(user, msg, stored, screened.notice);
     return;
   }
-  if (text !== null) {
-    user = await applyScreening(user, text);
-    await handleChat(user, text, msg.id);
-    return;
+  await handleChat(user, stored, screened.notice);
+}
+
+// ---------------------------------------------------------------------------
+// Limits
+// ---------------------------------------------------------------------------
+async function withinLimits(user: UserRow, isPhoto: boolean): Promise<boolean> {
+  const env = getEnv();
+  const since = new Date(Date.now() - LIMIT_WINDOW_MS).toISOString();
+  const base = () =>
+    db().from("messages").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("direction", "in").gte("created_at", since);
+  const [all, photos] = await Promise.all([base(), isPhoto ? base().eq("type", "image") : Promise.resolve({ count: 0 })]);
+
+  const state = limitState(
+    { messages: all.count ?? 0, photos: photos.count ?? 0 },
+    { messages: env.DAILY_MESSAGE_LIMIT, photos: env.DAILY_PHOTO_LIMIT },
+    isPhoto,
+  );
+  if (state === "ok") return true;
+
+  const column = state === "messages" ? "message_limit_notice_at" : "photo_limit_notice_at";
+  if (shouldNotify(user[column])) {
+    await db().from("users").update({ [column]: new Date().toISOString() }).eq("id", user.id);
+    await reply(user, state === "messages" ? t.messageLimit(env.DAILY_MESSAGE_LIMIT) : t.photoLimit(env.DAILY_PHOTO_LIMIT));
   }
-  await reply(user, t.unsupportedType);
+  return false;
 }
 
 // ---------------------------------------------------------------------------
 // Text chat
 // ---------------------------------------------------------------------------
-async function handleChat(user: UserRow, text: string, currentWaId: string): Promise<void> {
-  const system = buildSystemPrompt(user);
-  const messages = [...(await loadHistory(user.id, currentWaId)), { role: "user" as const, content: text }];
+async function handleChat(user: UserRow, current: MessageRow, notice: string | null): Promise<void> {
+  // Wait a moment: if the user keeps typing, only the last message's handler answers, covering all of them.
+  // 3 quick messages → 1 AI call and 1 WhatsApp message instead of 3.
+  const debounce = getEnv().REPLY_DEBOUNCE_MS;
+  if (debounce > 0) {
+    await sleep(debounce);
+    const latest = await db()
+      .from("messages")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("direction", "in")
+      .eq("type", "text")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest.data && latest.data.id !== current.id) return; // a newer message will answer
+    // Reload the user: an earlier message in the burst may have turned on restricted mode.
+    const fresh = await db().from("users").select("*").eq("id", user.id).single();
+    if (fresh.data) user = fresh.data as UserRow;
+  }
 
-  let ai: AiReply;
+  const system = buildSystemPrompt(user);
+  const messages = await loadTurns(user.id, CHAT_HISTORY, "user");
+  if (messages.length === 0) return; // already answered (e.g. a webhook retry)
+
+  let ai: AiReply | null = null;
+  let cost: Cost | null = null;
   try {
     ai = await chatReply(system, messages);
-    if (ai.refused) return void (await reply(user, t.refusal, ai.model));
+    cost = ai.cost;
+    if (ai.refused) return void (await reply(user, withNotice(notice, t.refusal), { model: ai.model, cost }));
 
     let checked = filterReply(ai.text, { sex: user.sex });
     if (!checked.safe) {
       console.warn("unsafe reply blocked, retrying", checked.reasons);
       ai = await chatReply(`${system}\n\n${SAFETY_RETRY_NOTE}`, messages);
+      cost = addCosts(cost, ai.cost);
       checked = filterReply(ai.text, { sex: user.sex });
-      if (ai.refused || !checked.safe) return void (await reply(user, t.unsafeReplyFallback, ai.model));
+      if (ai.refused || !checked.safe)
+        return void (await reply(user, withNotice(notice, t.unsafeReplyFallback), { model: ai.model, cost }));
     }
 
     let out = checked.text;
-    if (user.restricted_mode && /kcal|calor[ií]a/i.test(out)) out += `\n\n${t.restrictedFooter}`;
-    await reply(user, out, ai.model);
+    if (user.restricted_mode && !notice && /kcal|calor[ií]a/i.test(out)) out += `\n\n${t.restrictedFooter}`;
+    await reply(user, withNotice(notice, out), { model: ai.model, cost });
   } catch (err) {
     console.error("chat reply failed", err);
-    await reply(user, t.aiError);
+    await reply(user, withNotice(notice, t.aiError), { model: ai?.model ?? null, cost });
   }
 }
 
@@ -147,22 +210,23 @@ async function handlePhoto(
   user: UserRow,
   msg: Extract<IncomingMessage, { kind: "image" }>,
   inbound: MessageRow,
+  notice: string | null,
 ): Promise<void> {
   try {
     const media = await downloadMedia(msg.mediaId);
-    const mediaType = media.mimeType.split(";")[0].trim() as ImageMediaType;
-    if (!IMAGE_TYPES.includes(mediaType)) return void (await reply(user, t.unsupportedType));
-    if (media.data.length > MAX_IMAGE_BYTES) return void (await reply(user, t.imageTooLarge));
+    let jpeg: Buffer;
+    try {
+      jpeg = await prepareImage(media.data); // ~1024 px JPEG: ~60% fewer tokens, smaller storage
+    } catch {
+      return void (await reply(user, withNotice(notice, t.unsupportedType)));
+    }
 
-    // Save the photo in the private bucket: <user_id>/<uuid>.<ext>
-    const path = `${user.id}/${randomUUID()}.${mediaType.split("/")[1].replace("jpeg", "jpg")}`;
-    const upload = await db().storage.from(PHOTOS_BUCKET).upload(path, media.data, { contentType: mediaType });
+    // Save the (resized) photo in the private bucket: <user_id>/<uuid>.jpg
+    const path = `${user.id}/${randomUUID()}.jpg`;
+    const upload = await db().storage.from(PHOTOS_BUCKET).upload(path, jpeg, { contentType: "image/jpeg" });
     if (upload.error) throw new Error(`photo upload failed: ${upload.error.message}`);
-    await db().from("photos").insert({ user_id: user.id, storage_path: path, wa_media_id: msg.mediaId, mime_type: mediaType, kind: "meal" });
+    await db().from("photos").insert({ user_id: user.id, storage_path: path, wa_media_id: msg.mediaId, mime_type: "image/jpeg", kind: "meal" });
     await db().from("messages").update({ media_path: path }).eq("id", inbound.id);
-
-    // Screen the caption too (e.g. "estoy embarazada, ¿esto está bien?").
-    if (msg.caption) user = await applyScreening(user, msg.caption);
 
     let instructions = PHOTO_INSTRUCTIONS;
     if (user.restricted_mode)
@@ -170,34 +234,38 @@ async function handlePhoto(
         "The user sent a photo. Describe the foods you see and give one general healthy-habit tip. Do NOT give calorie or macro numbers.";
     if (msg.caption) instructions += `\n\nThe user's caption: "${msg.caption}"`;
 
-    const ai = await photoReply(buildSystemPrompt(user), await loadHistory(user.id, msg.id, 6), { base64: media.data.toString("base64"), mediaType }, instructions);
-    if (ai.refused) return void (await reply(user, t.refusal, ai.model));
+    const history = await loadTurns(user.id, PHOTO_HISTORY, "assistant", inbound.id);
+    const ai = await photoReply(buildSystemPrompt(user), history, jpeg.toString("base64"), instructions);
+    if (ai.refused) return void (await reply(user, withNotice(notice, t.refusal), { model: ai.model, cost: ai.cost }));
 
     const checked = filterReply(ai.text, { sex: user.sex });
-    if (!checked.safe) return void (await reply(user, t.unsafeReplyFallback, ai.model));
+    if (!checked.safe) return void (await reply(user, withNotice(notice, t.unsafeReplyFallback), { model: ai.model, cost: ai.cost }));
 
     // Photo calories are ALWAYS labeled as estimates, in code.
     const out = user.restricted_mode ? checked.text : labelAsEstimate(checked.text, t.photoHeader, t.photoFooter);
-    await reply(user, out, ai.model);
+    await reply(user, withNotice(notice, out), { model: ai.model, cost: ai.cost });
   } catch (err) {
     console.error("photo reply failed", err);
-    await reply(user, t.aiError);
+    await reply(user, withNotice(notice, t.aiError));
   }
 }
 
 // ---------------------------------------------------------------------------
 // Safety screening → restricted mode (sticky)
 // ---------------------------------------------------------------------------
-async function applyScreening(user: UserRow, text: string): Promise<UserRow> {
+async function applyScreening(user: UserRow, text: string | null): Promise<{ user: UserRow; notice: string | null }> {
+  if (!text) return { user, notice: null };
   const { flags } = screenMessage(text);
   const newFlags = flags.filter((f) => !user.risk_flags.includes(f));
-  if (newFlags.length === 0) return user;
+  if (newFlags.length === 0) return { user, notice: null };
 
   const risk_flags: RiskFlag[] = [...user.risk_flags, ...newFlags];
-  const wasRestricted = user.restricted_mode;
   await db().from("users").update({ risk_flags, restricted_mode: true }).eq("id", user.id);
-  if (!wasRestricted) await reply(user, t.restrictedNotice);
-  return { ...user, risk_flags, restricted_mode: true };
+  return { user: { ...user, risk_flags, restricted_mode: true }, notice: user.restricted_mode ? null : t.restrictedNotice };
+}
+
+function withNotice(notice: string | null, text: string): string {
+  return notice ? `${notice}\n\n${text}` : text;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,33 +330,43 @@ async function storeInbound(user: UserRow, msg: IncomingMessage): Promise<Messag
   return res.data as MessageRow;
 }
 
-/** Sends a reply and stores it. `skipStore` is used right after purging a minor's messages. */
-async function reply(user: UserRow, text: string, model: string | null = null, skipStore = false): Promise<void> {
+/** Sends a reply and stores it with its AI cost. `skipStore` is used right after purging a minor's messages. */
+async function reply(
+  user: UserRow,
+  text: string,
+  opts: { model?: string | null; cost?: Cost | null; skipStore?: boolean } = {},
+): Promise<void> {
   const ids = await sendText(user.wa_id, text);
-  if (skipStore) return;
-  const { error } = await db()
-    .from("messages")
-    .insert({ user_id: user.id, direction: "out", wa_message_id: ids[0] ?? null, type: "text", body: text, model });
+  if (opts.skipStore) return;
+  const { error } = await db().from("messages").insert({
+    user_id: user.id,
+    direction: "out",
+    wa_message_id: ids[0] ?? null,
+    type: "text",
+    body: text,
+    model: opts.model ?? null,
+    input_tokens: opts.cost?.inputTokens ?? null,
+    output_tokens: opts.cost?.outputTokens ?? null,
+    ai_cost_usd: opts.cost?.costUsd ?? null,
+  });
   if (error) console.error("outbound message insert failed", error.message);
 }
 
-/** Recent conversation as alternating user/assistant turns (Claude requires them to alternate and start with user). */
-async function loadHistory(userId: string, excludeWaId: string, limit = HISTORY_LIMIT): Promise<ChatTurn[]> {
+/** Recent conversation as Claude turns. `endWith: "user"` keeps the pending user messages as the question. */
+async function loadTurns(userId: string, limit: number, endWith: "user" | "assistant", excludeId?: string): Promise<ChatTurn[]> {
   const { data, error } = await db()
     .from("messages")
-    .select("direction, body, wa_message_id")
+    .select("id, direction, body")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit + 1);
   if (error) throw new Error(`history load failed: ${error.message}`);
-
-  const rows = (data as Pick<MessageRow, "direction" | "body" | "wa_message_id">[])
-    .filter((r) => r.wa_message_id !== excludeWaId && r.body)
-    .reverse();
-  return toTurns(rows);
+  const rows = (data as Pick<MessageRow, "id" | "direction" | "body">[]).filter((r) => r.id !== excludeId).reverse();
+  return toTurns(rows, endWith);
 }
 
-export function toTurns(rows: Array<{ direction: "in" | "out"; body: string | null }>): ChatTurn[] {
+/** Claude needs alternating turns that start with the user. Consecutive messages from one side are merged. */
+export function toTurns(rows: Array<{ direction: "in" | "out"; body: string | null }>, endWith: "user" | "assistant"): ChatTurn[] {
   const turns: ChatTurn[] = [];
   for (const r of rows) {
     if (!r.body) continue;
@@ -298,8 +376,8 @@ export function toTurns(rows: Array<{ direction: "in" | "out"; body: string | nu
     else turns.push({ role, content: r.body });
   }
   while (turns.length && turns[0].role !== "user") turns.shift();
-  // The caller appends the current user message, so history must end with the assistant.
-  if (turns.length && turns[turns.length - 1].role === "user") turns.pop();
+  if (endWith === "assistant" && turns.length && turns[turns.length - 1].role === "user") turns.pop();
+  if (endWith === "user" && turns.length && turns[turns.length - 1].role === "assistant") return []; // nothing pending
   return turns;
 }
 

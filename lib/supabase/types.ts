@@ -21,6 +21,8 @@ export interface UserRow {
   reminders_opt_out_at: string | null;
   pending_deletion_at: string | null;
   last_inbound_at: string | null;
+  message_limit_notice_at: string | null;
+  photo_limit_notice_at: string | null;
   created_at: string;
 }
 

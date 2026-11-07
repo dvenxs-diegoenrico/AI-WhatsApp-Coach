@@ -97,6 +97,12 @@ export const t = {
     "Lo recomendable es una pérdida gradual (máximo alrededor de 1 kg por semana) sin comer por debajo de un mínimo saludable. " +
     "Si quieres, armamos juntos un plan sostenible.",
 
+  messageLimit: (limit: number) =>
+    `Llegamos al límite de ${limit} mensajes en 24 horas 🙌. Así mantenemos el servicio a buen precio para todos. ` +
+    "En unas horas seguimos conversando. Los comandos *BORRAR MIS DATOS* y *ALTO* siguen funcionando.",
+  photoLimit: (limit: number) =>
+    `Ya analicé ${limit} fotos en las últimas 24 horas 📸. Mientras tanto, puedes describirme tu comida con texto y te ayudo igual.`,
+
   aiError: "Uy, tuve un problema para responderte 😓. ¿Me lo vuelves a mandar en un momento?",
   refusal: "Prefiero no responder eso. ¿Te ayudo con algo sobre tu alimentación o tu ejercicio?",
 } as const;

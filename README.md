@@ -46,6 +46,21 @@ npm run build
 npm run simulate -- "Hola A"   # send a signed fake WhatsApp message to localhost
 ```
 
+## Cost controls
+
+| What | How it saves money |
+|---|---|
+| Reply delay (`REPLY_DEBOUNCE_MS`, 3 s) | A burst of messages ("hola" / "una pregunta" / "¿qué ceno?") gets **one** AI call and **one** WhatsApp message |
+| Notices merged into the reply | Safety notices are added to the answer instead of being sent as a separate message |
+| Reactions and stickers ignored | No paid reply to a 👍 |
+| Daily limits (`DAILY_MESSAGE_LIMIT` 60, `DAILY_PHOTO_LIMIT` 5) | One friendly notice, then silence until the 24 h window frees up; commands always work |
+| Photos resized to 1024 px JPEG | ~60% fewer image tokens and less storage |
+| Photos on `claude-sonnet-5-5` | About half the price of Opus |
+| Chat on `claude-haiku-5-5` at low effort, 10 messages of history | A text answer costs a fraction of a cent |
+| Short answers (≈90 words) | Fewer output tokens; never split into several WhatsApp messages |
+
+Every AI reply stores `input_tokens`, `output_tokens` and `ai_cost_usd` in `messages`. The `usage_daily` view adds them up per user and day, plus an estimate of the WhatsApp cost.
+
 ## Roadmap
 
 1. ✅ **Milestone 1:** scaffold, schema, WhatsApp webhook, onboarding, AI replies, photo estimates, delete command

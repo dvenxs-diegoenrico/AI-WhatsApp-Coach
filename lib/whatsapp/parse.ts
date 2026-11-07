@@ -63,6 +63,9 @@ export function parseWebhook(payload: unknown, ourPhoneNumberId: string): Incomi
           });
         } else if (m.type === "audio" && m.audio?.id) {
           out.push({ ...base, kind: "audio", mediaId: m.audio.id, mimeType: m.audio.mime_type ?? "audio/ogg" });
+        } else if (m.type === "reaction" || m.type === "sticker") {
+          // Reactions (👍 on a message) and stickers need no answer; replying would cost a message.
+          continue;
         } else {
           out.push({ ...base, kind: "other", type: m.type ?? "unknown" });
         }
