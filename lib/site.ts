@@ -7,8 +7,10 @@
 const env = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
 
 export const site = {
-  name: "Coach de nutrición con IA",
-  shortName: "Coach IA",
+  /** Brand name. One spelling everywhere; lowercase "whatupcoach" for domains and social handles. */
+  name: "WhatUpCoach",
+  shortName: "WhatUpCoach",
+  tagline: "Coach de nutrición con IA",
   /** WhatsApp number in international format, digits only, e.g. 5215512345678 */
   whatsappNumber: env(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER),
   /** Legal data for the privacy notice and terms */
