@@ -44,7 +44,7 @@ The models are already set in code: `claude-haiku-5-5` for chat (fast and cheap)
    **Region: East US (North Virginia)**. Vercel runs in the same area by default, which keeps things fast.
 2. Wait about 2 minutes until the project is ready.
 3. Left menu → **SQL Editor → New query**. Open `supabase/migrations/0001_init.sql` from this repo, copy **all** of it, paste it, and click **Run**. You should see "Success. No rows returned".
-   Then do the same with `supabase/migrations/0002_costs_and_limits.sql`, in a **new query**. It adds cost tracking and the daily limits.
+   Then do the same with `supabase/migrations/0002_costs_and_limits.sql` and `supabase/migrations/0003_photos_private.sql`, each in a **new query**, in that order.
 4. Check: **Table Editor** shows `users`, `messages`, `photos`, `meals`, `workouts`, `weights`, `subscriptions` and `deletion_log`. **Storage** shows a bucket named `photos` marked **Private**.
 5. **Project Settings → Data API**: copy the **Project URL**.
 6. **Project Settings → API Keys**: copy the **secret** key (`sb_secret_…`). If you only see the "Legacy" tab, copy the **service_role** key instead.

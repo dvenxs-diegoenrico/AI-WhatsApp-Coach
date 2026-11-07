@@ -213,4 +213,4 @@ alter table public.deletion_log   enable row level security;
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', false)
-on conflict (id) do nothing;
+on conflict (id) do update set public = false;  -- if it already existed as public, make it private
