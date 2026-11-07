@@ -161,25 +161,45 @@ The token from 4b dies after 24 h. Replace it with one that doesn't expire:
 
 ---
 
-## 7. Stripe (prep for milestone 3, optional now)
+## 7. Stripe (payments): 30 min
+
+How it works: after signing up, each user gets a **free demo** (1 photo + 3 questions, no card). Then the bot sends a link to choose a plan → Stripe Checkout → **3-day trial with card required** → subscription. `MI CUENTA` in WhatsApp opens the Stripe portal (change plan, update card, cancel).
+
+**Payments stay OFF until all four Stripe variables are set.** Until then everyone has full access for free, so you can test the bot without Stripe.
 
 Use **Test mode** (toggle at the top) until launch.
 
-1. **Product catalog → Add product**: name "Coach de nutrición con IA".
-   - Price 1: **199.00 MXN**, recurring, **monthly**
-   - **Add another price**: **1,490.00 MXN**, recurring, **yearly**
-   - Don't set a trial on the price. The 3-day trial with required card will be set in code at checkout (milestone 3).
-2. Open each price and copy its ID (`price_…`).
+1. **Supabase:** run `supabase/migrations/0005_billing.sql` in the SQL Editor.
+2. **Product catalog → Add product**: name "Coach de nutrición con IA".
+   - Price 1: **199.00 MXN**, recurring, **monthly**. Under tax behavior, choose **inclusive** (the price already includes IVA). Ask your accountant.
+   - **Add another price**: **1,490.00 MXN**, recurring, **yearly**, also inclusive.
+   - Don't set a trial on the price: the 3-day trial is set by the code, once per WhatsApp number.
+   - Open each price and copy its ID (`price_…`).
 3. **Developers → API keys → Secret key** (`sk_test_…`).
+4. **Developers → Webhooks → Add endpoint**
+   - URL: `https://YOUR-DOMAIN/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+   - After saving, copy the **Signing secret** (`whsec_…`).
+5. **Settings → Billing → Customer portal** → **Activate**. Allow: update payment method, cancel subscriptions (at end of period), and switch plans between your two prices.
+6. **Settings → Billing → Subscriptions and emails → Manage failed payments**: after all retries fail, **cancel the subscription**. Turn on the emails for failed payments and receipts.
+7. In **Vercel → Environment Variables** add (Secret, Production + Preview), then **Redeploy**:
 
 | Variable | Value |
 |---|---|
 | `STRIPE_SECRET_KEY` | `sk_test_…` |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` |
 | `STRIPE_PRICE_MONTHLY` | monthly price ID |
 | `STRIPE_PRICE_YEARLY` | yearly price ID |
-| `STRIPE_WEBHOOK_SECRET` | leave empty; we create the webhook in milestone 3 |
 
-For **live** mode, Stripe México will ask for business details (RFC, CLABE bank account, ID). Start that early, because approval can take a few days.
+Optional: `DEMO_PHOTOS` (default 1), `DEMO_QUESTIONS` (default 3), `APP_URL` (only if you use your own domain; otherwise the Vercel production domain is used).
+
+**Test it** (test mode, card `4242 4242 4242 4242`, any future date, any CVC):
+1. Use your free photo and 3 questions → the bot sends "Ese fue el final de tu prueba gratis" with a link.
+2. Open the link → choose a plan → pay with the test card → WhatsApp: "Tu prueba de 3 días empezó".
+3. Send `MI CUENTA` → the portal opens → cancel → WhatsApp: "Tu suscripción terminó" (at the end of the period, or immediately if you cancel from the Stripe dashboard).
+4. In Supabase, `subscriptions` shows your row and `funnel_by_audience` counts you as subscribed.
+
+For **live** mode, Stripe México asks for business details (RFC, CLABE bank account, ID). Start early: approval can take a few days. Then repeat steps 2–7 in live mode (new keys, prices and webhook).
 
 ---
 

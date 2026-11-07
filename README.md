@@ -34,6 +34,8 @@ WhatsApp ──► Meta ──► POST /api/whatsapp/webhook
 | Never a "nutriólogo" | `output-filter.ts` rewrites self-identification | — |
 | Photo calories are estimates | `labelAsEstimate()` on every photo reply | `meals.photo_meals_are_estimates` check |
 | Health-data consent; delete all my data | onboarding + `BORRAR MIS DATOS` → `CONFIRMO BORRAR` | `health_consent_at`, `consent_version`; cascade deletes; `deletion_log` |
+| Free demo, then 3-day trial with card (once per number) | `lib/billing/access.ts`, `app/api/checkout` | `users.demo_*_used`, `users.trial_used_at` |
+| Deleting data also cancels the subscription | `handle-message.ts` → `cancelSubscriptionNow()` | — |
 | Reminders only after opt-in; one reply stops them | `ALTO` / `STOP` command (sending comes in milestone 4) | `reminders_opt_in_at`, `reminders_opt_out_at` |
 | Audience code from first message | `lib/conversation/audience.ts` | `audience_code` is write-once (trigger) |
 | Neutral Spanish for any Spanish speaker; foods, time zone and crisis line adapted to the country of the phone number; 3 personalities | `lib/i18n/es.ts`, `lib/i18n/countries.ts`, `lib/ai/prompts.ts` | `users.personality`, `users.timezone` |
@@ -67,6 +69,6 @@ Every AI reply stores `input_tokens`, `output_tokens` and `ai_cost_usd` in `mess
 
 1. ✅ **Milestone 1:** scaffold, schema, WhatsApp webhook, onboarding, AI replies, photo estimates, delete command
 2. Profile (sex, height, weight, goal), safe calorie targets, logging meals, weights and workouts, voice-note transcription
-3. Stripe subscriptions ($199 MXN/month, $1,490 MXN/year, 3-day trial, card required)
+3. ✅ Stripe: free demo (1 photo + 3 questions) → 3-day trial with card → $199 MXN/month or $1,490 MXN/year; `MI CUENTA` opens the customer portal
 4. Reminders with opt-in (Vercel Cron + approved WhatsApp templates)
 5. Web dashboard

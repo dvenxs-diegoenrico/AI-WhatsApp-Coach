@@ -16,6 +16,9 @@ import { parseAudienceCode } from "./audience";
 import { detectCommand, DELETE_CONFIRM_WINDOW_MS } from "./commands";
 import { currentQuestion, runOnboarding } from "./onboarding";
 import { LIMIT_WINDOW_MS, limitState, shouldNotify } from "./limits";
+import { accessFor, demoLeft, PAYWALL_NOTICE_EVERY_MS, type Access } from "@/lib/billing/access";
+import { billingEnabled } from "@/lib/billing/stripe";
+import { cancelSubscriptionNow, getSubscription, payLink, portalLink } from "@/lib/billing/subscriptions";
 
 /** Messages of context sent with a text question (fewer = cheaper; 10 is enough for a WhatsApp chat). */
 const CHAT_HISTORY = 10;
@@ -75,6 +78,15 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
       await reply(user, t.deleteNothingPending);
       return;
     }
+    if (billingEnabled()) {
+      try {
+        await cancelSubscriptionNow(user.id); // never keep charging someone whose data we deleted
+      } catch (err) {
+        console.error("subscription cancel before deletion failed", err);
+        await reply(user, t.deleteCancelFailed);
+        return;
+      }
+    }
     await deleteAllUserData(user);
     await sendText(user.wa_id, t.deleteDone); // not stored: the user no longer exists
     return;
@@ -85,6 +97,14 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
       .update({ reminders_opt_out_at: new Date().toISOString(), reminders_opt_in_at: null })
       .eq("id", user.id);
     await reply(user, t.remindersStopped);
+    return;
+  }
+
+  if (command === "account") {
+    if (!billingEnabled()) return void (await reply(user, t.billingOff));
+    if (user.onboarding_step !== "done") return void (await reply(user, `${t.finishOnboardingFirst}\n\n${currentQuestion(user.onboarding_step)}`));
+    const sub = await getSubscription(user.id);
+    await reply(user, sub?.stripe_customer_id ? t.account(portalLink(user.id)) : t.accountNoSubscription(payLink(user.id)));
     return;
   }
 
@@ -101,7 +121,12 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
       if (error) throw new Error(`onboarding update failed: ${error.message}`);
     }
     if (result.purgeMessages) await db().from("messages").delete().eq("user_id", user.id);
-    await reply(user, result.reply, { skipStore: result.purgeMessages });
+    let replyText = result.reply;
+    if (result.update.onboarding_step === "done" && billingEnabled()) {
+      const env = getEnv();
+      replyText += `\n\n${t.demoIntro(env.DEMO_PHOTOS, env.DEMO_QUESTIONS)}`;
+    }
+    await reply(user, replyText, { skipStore: result.purgeMessages });
     return;
   }
 
@@ -109,6 +134,11 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
     await reply(user, t.unsupportedType);
     return;
   }
+
+  // Payments: subscribed / free demo / subscribe to continue.
+  const access = await checkAccess(user, msg.kind === "image" ? "photo" : "text");
+  if (access === "paywall") return;
+  const demo = access === "demo";
 
   // Fair-use limits (rolling 24 h). Past the limit we answer once, then stay quiet: every reply costs money.
   if (!(await withinLimits(user, msg.kind === "image"))) return;
@@ -118,10 +148,44 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
   user = screened.user;
 
   if (msg.kind === "image") {
-    await handlePhoto(user, msg, stored, screened.notice);
+    await handlePhoto(user, msg, stored, screened.notice, demo);
     return;
   }
-  await handleChat(user, stored, screened.notice);
+  await handleChat(user, stored, screened.notice, demo);
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+async function checkAccess(user: UserRow, kind: "text" | "photo"): Promise<Access> {
+  if (!billingEnabled()) return "full";
+  const env = getEnv();
+  const sub = await getSubscription(user.id);
+  const limits = { photos: env.DEMO_PHOTOS, questions: env.DEMO_QUESTIONS };
+  const used = { photos: user.demo_photos_used, questions: user.demo_questions_used };
+  const access = accessFor({ billingEnabled: true, status: sub?.status ?? null, kind, demoUsed: used, demoLimits: limits });
+  if (access !== "paywall") return access;
+
+  // At most one reminder per hour: every WhatsApp message we send costs money.
+  const last = user.paywall_notice_at ? new Date(user.paywall_notice_at).getTime() : 0;
+  if (Date.now() - last > PAYWALL_NOTICE_EVERY_MS) {
+    await db().from("users").update({ paywall_notice_at: new Date().toISOString() }).eq("id", user.id);
+    await reply(user, t.paywall(payLink(user.id), !user.trial_used_at, kind, demoLeft(used, limits).questions));
+  }
+  return "paywall";
+}
+
+/** Counts one free try and adds what's left (or the invitation to subscribe) to the same reply. */
+async function consumeDemo(user: UserRow, kind: "text" | "photo", text: string): Promise<string> {
+  const env = getEnv();
+  const used = {
+    photos: user.demo_photos_used + (kind === "photo" ? 1 : 0),
+    questions: user.demo_questions_used + (kind === "text" ? 1 : 0),
+  };
+  await db().from("users").update({ demo_photos_used: used.photos, demo_questions_used: used.questions }).eq("id", user.id);
+  const left = demoLeft(used, { photos: env.DEMO_PHOTOS, questions: env.DEMO_QUESTIONS });
+  if (left.photos + left.questions === 0) return `${text}\n\n${t.demoFinished(payLink(user.id), !user.trial_used_at)}`;
+  return `${text}\n\n${t.demoLeft(left.photos, left.questions)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +216,7 @@ async function withinLimits(user: UserRow, isPhoto: boolean): Promise<boolean> {
 // ---------------------------------------------------------------------------
 // Text chat
 // ---------------------------------------------------------------------------
-async function handleChat(user: UserRow, current: MessageRow, notice: string | null): Promise<void> {
+async function handleChat(user: UserRow, current: MessageRow, notice: string | null, demo = false): Promise<void> {
   // Wait a moment: if the user keeps typing, only the last message's handler answers, covering all of them.
   // 3 quick messages → 1 AI call and 1 WhatsApp message instead of 3.
   const debounce = getEnv().REPLY_DEBOUNCE_MS;
@@ -196,6 +260,7 @@ async function handleChat(user: UserRow, current: MessageRow, notice: string | n
 
     let out = checked.text;
     if (user.restricted_mode && !notice && /kcal|calor[ií]a/i.test(out)) out += `\n\n${t.restrictedFooter}`;
+    if (demo) out = await consumeDemo(user, "text", out);
     await reply(user, withNotice(notice, out), { model: ai.model, cost });
   } catch (err) {
     console.error("chat reply failed", err);
@@ -211,6 +276,7 @@ async function handlePhoto(
   msg: Extract<IncomingMessage, { kind: "image" }>,
   inbound: MessageRow,
   notice: string | null,
+  demo = false,
 ): Promise<void> {
   try {
     const media = await downloadMedia(msg.mediaId);
@@ -242,7 +308,8 @@ async function handlePhoto(
     if (!checked.safe) return void (await reply(user, withNotice(notice, t.unsafeReplyFallback), { model: ai.model, cost: ai.cost }));
 
     // Photo calories are ALWAYS labeled as estimates, in code.
-    const out = user.restricted_mode ? checked.text : labelAsEstimate(checked.text, t.photoHeader, t.photoFooter);
+    let out = user.restricted_mode ? checked.text : labelAsEstimate(checked.text, t.photoHeader, t.photoFooter);
+    if (demo) out = await consumeDemo(user, "photo", out);
     await reply(user, withNotice(notice, out), { model: ai.model, cost: ai.cost });
   } catch (err) {
     console.error("photo reply failed", err);

@@ -40,6 +40,14 @@ const schema = z.object({
   STRIPE_PRICE_MONTHLY: z.string().optional(),
   STRIPE_PRICE_YEARLY: z.string().optional(),
 
+  // Public address of the app, used in payment links. Optional on Vercel (it uses the production domain).
+  APP_URL: z.string().url().optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
+
+  // Free demo before asking for a card
+  DEMO_PHOTOS: z.coerce.number().int().min(0).default(1),
+  DEMO_QUESTIONS: z.coerce.number().int().min(0).default(3),
+
   // Vercel Cron (milestone 4, optional for now)
   CRON_SECRET: z.string().optional(),
 });

@@ -103,9 +103,46 @@ export const t = {
   photoLimit: (limit: number) =>
     `Ya analicé ${limit} fotos en las últimas 24 horas 📸. Mientras tanto, puedes describirme tu comida con texto y te ayudo igual.`,
 
+  // Billing (free demo → 3-day trial with card → subscription)
+  demoIntro: (photos: number, questions: number) =>
+    `🎁 Para que me conozcas, tienes *${plural(photos, "análisis de foto", "análisis de foto")}* y *${plural(questions, "pregunta", "preguntas")}* gratis. ` +
+    "¡Mándame una foto de tu comida y te digo cuántas calorías tiene!",
+  demoLeft: (photos: number, questions: number) =>
+    `_Prueba gratis: te ${photos + questions === 1 ? "queda" : "quedan"} ${plural(questions, "pregunta", "preguntas")} y ${plural(photos, "foto", "fotos")}._`,
+  demoFinished: (link: string, trialAvailable: boolean) =>
+    "🎁 Ese fue el final de tu prueba gratis. " +
+    (trialAvailable
+      ? "Para seguir con tu coach, activa tus *3 días gratis*: registras tu tarjeta y, si cancelas antes de que terminen, no se te cobra nada."
+      : "Para seguir con tu coach, activa tu suscripción.") +
+    `\n👉 ${link}`,
+  paywall: (link: string, trialAvailable: boolean, kind: "text" | "photo", questionsLeft: number) =>
+    (kind === "photo" && questionsLeft > 0
+      ? `Ya usaste tu análisis de foto gratis 📸. Todavía puedes hacerme ${plural(questionsLeft, "pregunta", "preguntas")}, o `
+      : "Tu prueba gratis terminó. Para seguir, ") +
+    (trialAvailable ? "activa tus *3 días gratis* (cancela cuando quieras):" : "activa tu suscripción:") +
+    `\n👉 ${link}`,
+  account: (link: string) =>
+    `Aquí puedes cambiar de plan, actualizar tu tarjeta o cancelar 👉 ${link}\n_El enlace funciona durante 24 horas._`,
+  accountNoSubscription: (link: string) => `Todavía no tienes una suscripción. Elige tu plan aquí 👉 ${link}`,
+  billingOff: "Por ahora el servicio es gratis 🙌. No tienes nada que pagar.",
+  trialStarted: (date: string) =>
+    `🎉 ¡Listo! Tu prueba de 3 días empezó. Si no cancelas, el primer cobro será el *${date}*. ` +
+    "Escribe *MI CUENTA* cuando quieras administrarla. ¿En qué te ayudo hoy?",
+  subscriptionActive: (plan: string) =>
+    `🎉 ¡Listo! Tu plan *${plan}* está activo. Escribe *MI CUENTA* cuando quieras administrarlo. ¿En qué te ayudo hoy?`,
+  paymentFailed: (link: string) =>
+    `⚠️ No pudimos cobrar tu suscripción. Actualiza tu tarjeta para no perder el acceso 👉 ${link}`,
+  subscriptionEnded: (link: string) => `Tu suscripción terminó. Gracias por estos días 💚. Si quieres volver: 👉 ${link}`,
+  deleteCancelFailed:
+    "No pude cancelar tu suscripción en este momento, así que todavía no borré nada. Intenta de nuevo en unos minutos con *BORRAR MIS DATOS*.",
+
   aiError: "Uy, tuve un problema para responderte 😓. ¿Me lo vuelves a mandar en un momento?",
   refusal: "Prefiero no responder eso. ¿Te ayudo con algo sobre tu alimentación o tu ejercicio?",
 } as const;
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
 
 export const personalityLabel = {
   amigable: "amigable",
