@@ -4,7 +4,7 @@ export default function Home() {
       <h1>Coach de nutrición con IA</h1>
       <p>
         Tu coach de nutrición y ejercicio con IA, directo en WhatsApp. No sustituye a un
-        nutriólogo ni a un médico.
+        nutricionista ni a un médico.
       </p>
       <p>Muy pronto: tu panel con comidas, entrenamientos y peso.</p>
     </main>

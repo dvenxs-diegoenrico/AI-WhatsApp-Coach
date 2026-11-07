@@ -7,7 +7,8 @@ import { chatReply, photoReply, transcribeAudio, type AiReply, type ImageMediaTy
 import { buildSystemPrompt, PHOTO_INSTRUCTIONS, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
 import { screenMessage } from "@/lib/safety/screening";
 import { filterReply, labelAsEstimate } from "@/lib/safety/output-filter";
-import { t } from "@/lib/i18n/es-MX";
+import { t } from "@/lib/i18n/es";
+import { countryFromWaId, DEFAULT_TIMEZONE } from "@/lib/i18n/countries";
 import { parseAudienceCode } from "./audience";
 import { detectCommand, DELETE_CONFIRM_WINDOW_MS } from "./commands";
 import { currentQuestion, runOnboarding } from "./onboarding";
@@ -34,7 +35,7 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
   await db().from("users").update({ last_inbound_at: new Date().toISOString() }).eq("id", user.id);
 
   if (isNew) {
-    if (msg.kind === "text" && screenMessage(msg.text).crisis) await reply(user, t.crisis);
+    if (msg.kind === "text" && screenMessage(msg.text).crisis) await reply(user, t.crisis(countryFromWaId(user.wa_id)));
     await reply(user, t.welcome);
     return;
   }
@@ -51,7 +52,7 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
 
   // Crisis language gets a fixed, safe answer for everyone, before anything else.
   if (text && screenMessage(text).crisis) {
-    await reply(user, t.crisis);
+    await reply(user, t.crisis(countryFromWaId(user.wa_id)));
     return;
   }
 
@@ -214,6 +215,7 @@ async function findOrCreateUser(msg: IncomingMessage): Promise<{ user: UserRow; 
     .insert({
       wa_id: msg.from,
       display_name: msg.name,
+      timezone: countryFromWaId(msg.from)?.timezone ?? DEFAULT_TIMEZONE,
       audience_code: parseAudienceCode(firstText),
       first_message: firstText.slice(0, 500) || `[${msg.kind}]`,
     })

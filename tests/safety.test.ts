@@ -21,6 +21,7 @@ describe("limits", () => {
 describe("screening", () => {
   it.each([
     ["Estoy embarazada de 3 meses", "pregnancy"],
+    ["estoy encinta", "pregnancy"],
     ["tengo diabetes tipo 2", "diabetes"],
     ["Me inyecto insulina", "diabetes"],
     ["tengo insuficiencia renal", "kidney"],
@@ -61,6 +62,8 @@ describe("output filter", () => {
     "Es posible bajar 1 a 1.5 kilos a la semana.",
     "Puedes bajar 10 kilos en un mes.",
     "Haz un ayuno de 3 días.",
+    "Puedes bajar 3 libras por semana.",
+    "Baja 10 libras en dos semanas.",
     "Prueba una dieta de jugos.",
   ])("blocks unsafe advice: %s", (text) => expect(filterReply(text).safe).toBe(false));
 
@@ -75,6 +78,7 @@ describe("output filter", () => {
     "Lo sano es bajar entre 0.5 y 1 kg por semana.",
     "Unos tacos de 450 calorías están bien para la comida.",
     "Bajar 4 kilos en un mes es un buen ritmo.",
+    "Bajar 1 a 2 libras por semana es razonable.",
   ])("allows safe advice: %s", (text) => expect(filterReply(text).safe).toBe(true));
 
   it("labels photo estimates", () => {

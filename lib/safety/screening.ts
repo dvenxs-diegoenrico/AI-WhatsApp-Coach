@@ -13,7 +13,7 @@ const PATTERNS: Record<RiskFlag, RegExp[]> = {
     /\blaxante/, /\bpurgar(me)?\b/, /\bdejar de comer\b/, /\bno (he )?com(o|er|ido) (en|por) (\d+|varios|dos|tres) dias/,
     /\bme da (miedo|culpa) comer/, /\bme siento culpable (de|por) comer/, /\bodio mi cuerpo/,
   ],
-  pregnancy: [/\bembarazad/, /\bembarazo\b/, /\blactancia\b/, /\bamamant/, /\bestoy esperando (un )?beb/],
+  pregnancy: [/\bembarazad/, /\bencinta\b/, /\bgestacion\b/, /\bembarazo\b/, /\blactancia\b/, /\bamamant/, /\bestoy esperando (un )?beb/],
   diabetes: [/\bdiabet/, /\bprediabet/, /\binsulina\b/, /\bmetformina\b/, /\bglucosa alta\b/],
   kidney: [/\brinon(es)?\b/, /\brenal(es)?\b/, /\bdialisis\b/, /\bhemodialisis\b/, /\bnefropat/],
   heart: [

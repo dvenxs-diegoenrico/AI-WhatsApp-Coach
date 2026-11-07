@@ -1,4 +1,4 @@
-import { CONSENT_VERSION, personalityLabel, t } from "@/lib/i18n/es-MX";
+import { CONSENT_VERSION, personalityLabel, t } from "@/lib/i18n/es";
 import { MIN_AGE } from "@/lib/safety/limits";
 import { normalize } from "@/lib/safety/normalize";
 import type { OnboardingStep, Personality, UserRow } from "@/lib/supabase/types";

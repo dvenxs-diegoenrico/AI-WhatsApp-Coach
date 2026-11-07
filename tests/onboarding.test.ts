@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseAge, parseConsent, parsePersonality, runOnboarding } from "@/lib/conversation/onboarding";
 import { detectCommand } from "@/lib/conversation/commands";
-import { t } from "@/lib/i18n/es-MX";
+import { t } from "@/lib/i18n/es";
 
 describe("onboarding", () => {
   it("parses age", () => {

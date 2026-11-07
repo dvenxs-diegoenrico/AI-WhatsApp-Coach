@@ -17,12 +17,14 @@ const DAILY_KCAL = new RegExp(String.raw`${NUM}(?:\s*(?:-|a|y)\s*${NUM})?\s*(?:k
 // "daily" must sit right next to the number, so a single meal's calories ("este plato tiene 650 kcal") don't count.
 const DAY_AFTER = /^.{0,15}(al dia|por dia|diari|cada dia|a diario)/;
 const DAY_BEFORE = /(dieta de|consum\w* (solo )?|comer solo|come solo|limit\w* a|no pases de|maximo de?)\s*$/;
+// Weight units: kg, or pounds (common for Spanish speakers in the US).
+const UNIT = String.raw`(kg|kilos?|kilogramos?|lbs?|libras?)`;
 const WEEKLY_LOSS = new RegExp(
-  String.raw`${NUM}(?:\s*(?:-|a|y)\s*${NUM})?\s*(?:kg|kilos?|kilogramos?)\s*(?:a la semana|por semana|cada semana|semanal|en una semana|en 1 semana)`,
+  String.raw`${NUM}(?:\s*(?:-|a|y)\s*${NUM})?\s*${UNIT}\s*(?:a la semana|por semana|cada semana|semanal|en una semana|en 1 semana)`,
   "g",
 );
 const LOSS_OVER_TIME = new RegExp(
-  String.raw`${NUM}\s*(?:kg|kilos?|kilogramos?)\s*en\s*(\d+|un|una|dos|tres|cuatro)\s*(dias?|semanas?|mes(?:es)?)`,
+  String.raw`${NUM}\s*${UNIT}\s*en\s*(\d+|un|una|dos|tres|cuatro)\s*(dias?|semanas?|mes(?:es)?)`,
   "g",
 );
 const CRASH_DIET = [
@@ -40,6 +42,10 @@ function toNumber(raw: string | undefined): number | null {
   const s = /^\d{1,2}[.,]\d{3}$/.test(raw) ? raw.replace(/[.,]/, "") : raw.replace(",", ".");
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
+}
+
+function toKg(unit: string): number {
+  return unit.startsWith("l") ? 0.4536 : 1;
 }
 
 export interface FilterResult {
@@ -70,14 +76,16 @@ export function filterReply(reply: string, opts: { sex?: Sex | null } = {}): Fil
 
   // 3) Weekly loss above the limit.
   for (const m of n.matchAll(WEEKLY_LOSS)) {
+    const factor = toKg(m[3]);
     const values = [toNumber(m[1]), toNumber(m[2])].filter((v): v is number => v !== null);
-    if (values.some((v) => v > MAX_WEEKLY_LOSS_KG)) reasons.push("weekly_loss_above_limit");
+    if (values.some((v) => v * factor > MAX_WEEKLY_LOSS_KG)) reasons.push("weekly_loss_above_limit");
   }
   for (const m of n.matchAll(LOSS_OVER_TIME)) {
-    const kg = toNumber(m[1]);
-    const qty = WORD_NUM[m[2]] ?? toNumber(m[2]);
-    if (kg === null || !qty) continue;
-    const unit = m[3];
+    const amount = toNumber(m[1]);
+    const qty = WORD_NUM[m[3]] ?? toNumber(m[3]);
+    if (amount === null || !qty) continue;
+    const kg = amount * toKg(m[2]);
+    const unit = m[4];
     const weeks = unit.startsWith("dia") ? qty / 7 : unit.startsWith("semana") ? qty : qty * 4.33;
     if (kg / weeks > MAX_WEEKLY_LOSS_KG) reasons.push("loss_rate_above_limit");
   }

@@ -1,14 +1,17 @@
 /**
- * Every message the user sees, in Mexican Spanish, in one place.
+ * Every message the user sees, in neutral Spanish that reads naturally in any
+ * Spanish-speaking country (no country-specific slang), in one place.
  * Edit wording here; the logic lives elsewhere.
  */
+
+import type { Country } from "./countries";
 
 export const CONSENT_VERSION = "2026-11-v1";
 
 export const t = {
   welcome:
     "¡Hola! 👋 Soy tu *coach de nutrición con IA*. Te ayudo con tu alimentación, tu ejercicio y tus hábitos, aquí mismo por WhatsApp.\n\n" +
-    "Antes de empezar: no soy nutriólogo ni médico, y no sustituyo a un profesional de la salud.\n\n" +
+    "Antes de empezar: no soy nutricionista, nutriólogo ni médico, y no sustituyo a un profesional de la salud.\n\n" +
     "Para comenzar, ¿cuántos años tienes? (escribe solo el número)",
 
   askAgeAgain: "No te entendí 😅 ¿Cuántos años tienes? Escribe solo el número, por ejemplo: 32",
@@ -17,7 +20,7 @@ export const t = {
 
   minorBlocked:
     "Gracias por tu interés 🙏 Este servicio es solo para personas mayores de 18 años, así que no puedo acompañarte por aquí.\n\n" +
-    "Si quieres mejorar tu alimentación, platícalo con tu familia y con tu médico o un nutriólogo. ¡Cuídate mucho!",
+    "Si quieres mejorar tu alimentación, habla con tu familia y con tu médico o un nutricionista. ¡Cuídate mucho!",
 
   minorStillBlocked: "Lo siento, este servicio es solo para mayores de 18 años.",
 
@@ -74,14 +77,20 @@ export const t = {
   // Safety
   restrictedNotice:
     "Gracias por contarme. 💙 Con lo que me compartes, lo más seguro es que tu plan de alimentación lo haga un profesional de la salud " +
-    "(médico o nutriólogo) que pueda revisarte en persona. Yo puedo darte información general y acompañarte con hábitos, " +
+    "(médico o nutricionista) que pueda revisarte en persona. Yo puedo darte información general y acompañarte con hábitos, " +
     "pero no te daré metas de calorías ni dietas específicas.",
-  restrictedFooter: "_Recuerda: para tu caso, cualquier cambio en tu alimentación consúltalo con tu médico o nutriólogo._",
+  restrictedFooter: "_Recuerda: para tu caso, cualquier cambio en tu alimentación consúltalo con tu médico o nutricionista._",
 
-  crisis:
-    "Siento mucho que estés pasando por esto. 💙 No estás solo/a.\n\n" +
-    "Si estás en peligro o piensas en hacerte daño, llama ahora a la *Línea de la Vida: 800 911 2000* (gratis, 24 horas) o al *911*.\n\n" +
-    "También es muy importante que hables con un profesional de la salud sobre tu relación con la comida. Aquí sigo para escucharte.",
+  crisis: (country: Country | null) => {
+    const line = country?.crisisLine ? `llama ahora a la *${country.crisisLine}*` : "busca ayuda ahora mismo";
+    const emergency = country?.emergency ? `al *${country.emergency}*` : "al número de emergencias de tu país";
+    return (
+      "Siento mucho que estés pasando por esto. 💙 No estás solo/a.\n\n" +
+      `Si estás en peligro o piensas en hacerte daño, ${line} o llama ${emergency}. ` +
+      "También puedes acudir a la sala de urgencias más cercana o pedirle a alguien de confianza que te acompañe.\n\n" +
+      "Es muy importante que hables con un profesional de la salud. Aquí sigo para escucharte."
+    );
+  },
 
   unsafeReplyFallback:
     "Prefiero no darte una recomendación así: bajar de peso muy rápido o comer muy poco puede afectar tu salud. 🙏\n\n" +

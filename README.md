@@ -1,6 +1,6 @@
 # AI WhatsApp Coach
 
-A *coach de nutrición con IA* (AI nutrition and fitness coach) for Spanish-speaking adults in Mexico. Users chat with it on WhatsApp, and a small web dashboard comes later.
+A *coach de nutrición con IA* (AI nutrition and fitness coach) for Spanish-speaking adults (Latin America, the US, Spain…), starting with Mexico. Users chat with it on WhatsApp, and a small web dashboard comes later.
 
 **Stack:** Next.js (App Router, TypeScript) on Vercel · Supabase (Postgres + Storage) · Meta WhatsApp Cloud API · Claude API · Stripe (milestone 3) · Vercel Cron (milestone 4)
 
@@ -15,7 +15,7 @@ WhatsApp ──► Meta ──► POST /api/whatsapp/webhook
                          ▼ 3. after(): handleIncoming()
           find/create user (stores audience code "Hola A/B/C/D" on first message)
           store inbound message (unique WhatsApp id → never reply twice)
-          crisis check → commands (BORRAR MIS DATOS, CONFIRMO BORRAR, ALTO)
+          crisis check (local crisis line by country) → commands (BORRAR MIS DATOS, CONFIRMO BORRAR, ALTO)
           onboarding: age (18+) → health-data consent → personality
           text  → safety screening → Claude (fast model) → output filter → reply
           photo → save to private bucket → Claude (vision model) → filter → "estimate" label → reply
@@ -34,7 +34,7 @@ WhatsApp ──► Meta ──► POST /api/whatsapp/webhook
 | Health-data consent; delete all my data | onboarding + `BORRAR MIS DATOS` → `CONFIRMO BORRAR` | `health_consent_at`, `consent_version`; cascade deletes; `deletion_log` |
 | Reminders only after opt-in; one reply stops them | `ALTO` / `STOP` command (sending comes in milestone 4) | `reminders_opt_in_at`, `reminders_opt_out_at` |
 | Audience code from first message | `lib/conversation/audience.ts` | `audience_code` is write-once (trigger) |
-| Mexican Spanish, 3 personalities | `lib/i18n/es-MX.ts`, `lib/ai/prompts.ts` | `users.personality` |
+| Neutral Spanish for any Spanish speaker; foods, time zone and crisis line adapted to the country of the phone number; 3 personalities | `lib/i18n/es.ts`, `lib/i18n/countries.ts`, `lib/ai/prompts.ts` | `users.personality`, `users.timezone` |
 
 ## Commands
 

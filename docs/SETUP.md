@@ -94,7 +94,7 @@ You need a public URL before Meta can send you messages, so deploy first. Meta k
 On the **API Setup** page:
 1. Meta gives you a free **test phone number** in the "From" field.
 2. Under **"To" → Manage phone number list**, add **your own WhatsApp number** and type the code WhatsApp sends you.
-   For a Mexican cell phone, enter `+52` followed by your 10 digits, **without** an extra `1`.
+   Enter it with the country code, e.g. `+52` + 10 digits for Mexico (**without** the extra `1`), `+57` for Colombia, `+1` for the US.
 3. Copy:
 
 | Variable | Where on the page |
@@ -132,7 +132,7 @@ From **your phone** (the number you verified in 4b), send a WhatsApp message to 
 | `30` | Asks for consent to store health data → reply ACEPTO |
 | `ACEPTO` | Asks you to choose a personality (1, 2 or 3) |
 | `3` | "¡Listo! Voy a ser tu coach en modo balanceado…" |
-| `¿Qué puedo desayunar alto en proteína?` | An AI answer in Mexican Spanish |
+| `¿Qué puedo desayunar alto en proteína?` | An AI answer in Spanish, with foods from your country |
 | a photo of food | "📸 *Estimación aproximada*" with a calorie range and the estimate disclaimer |
 | a voice note | Asks you to type it (voice notes come later) |
 | `BORRAR MIS DATOS` then `CONFIRMO BORRAR` | Deletes everything; check in Supabase that your row is gone |
