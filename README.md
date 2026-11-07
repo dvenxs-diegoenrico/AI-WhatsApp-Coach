@@ -4,7 +4,9 @@ A *coach de nutrición con IA* (AI nutrition and fitness coach) for Spanish-spea
 
 **Stack:** Next.js (App Router, TypeScript) on Vercel · Supabase (Postgres + Storage) · Meta WhatsApp Cloud API · Claude API · Stripe (milestone 3) · Vercel Cron (milestone 4)
 
-👉 **First time? Follow [docs/SETUP.md](docs/SETUP.md).**
+👉 **First time? Follow [docs/SETUP.md](docs/SETUP.md).** Marketing plan and video scripts: [docs/MARKETING.md](docs/MARKETING.md).
+
+**Website:** `/` landing page (its button opens WhatsApp with "Hola D"), `/privacidad` privacy notice, `/terminos` terms. Configure with the `NEXT_PUBLIC_*` variables in `.env.example`.
 
 ## How a message flows
 
