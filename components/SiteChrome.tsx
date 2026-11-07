@@ -24,7 +24,7 @@ export function Footer() {
           {site.contactEmail && <a href={`mailto:${site.contactEmail}`}>Contacto</a>}
         </nav>
         <p>
-          {site.name}. Es una herramienta de acompañamiento con inteligencia artificial: no es un nutricionista, nutriólogo ni
+          {site.name} es un {site.tagline.toLowerCase()}: una herramienta de acompañamiento con inteligencia artificial: no es un nutricionista, nutriólogo ni
           médico, y no sustituye la atención de un profesional de la salud. Servicio solo para mayores de 18 años.
         </p>
         <p>

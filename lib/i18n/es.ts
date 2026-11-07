@@ -10,7 +10,7 @@ export const CONSENT_VERSION = "2026-11-v1";
 
 export const t = {
   welcome:
-    "¡Hola! 👋 Soy tu *coach de nutrición con IA*. Te ayudo con tu alimentación, tu ejercicio y tus hábitos, aquí mismo por WhatsApp.\n\n" +
+    "¡Hola! 👋 Soy *WhatUpCoach*, tu *coach de nutrición con IA*. Te ayudo con tu alimentación, tu ejercicio y tus hábitos, aquí mismo por WhatsApp.\n\n" +
     "Antes de empezar: no soy nutricionista, nutriólogo ni médico, y no sustituyo a un profesional de la salud.\n\n" +
     "Para comenzar, ¿cuántos años tienes? (escribe solo el número)",
 

@@ -13,7 +13,7 @@ export default function Home() {
         {/* Hero */}
         <div className="wrap hero">
           <div>
-            <span className="eyebrow">Coach de nutrición con IA · en WhatsApp</span>
+            <span className="eyebrow">{site.name} · tu coach de nutrición con IA en WhatsApp</span>
             <h1>Come mejor sin dietas extremas, desde tu WhatsApp</h1>
             <p className="lead">
               Mándale una foto de tu comida y recibe una estimación de calorías. Pregúntale qué cenar, cómo armar tu plato o
@@ -131,7 +131,7 @@ export default function Home() {
 
         <section className="alt">
           <div className="wrap" style={{ textAlign: "center" }}>
-            <h2>Empieza hoy, gratis</h2>
+            <h2>Empieza hoy con {site.name}, gratis</h2>
             <p className="lead" style={{ margin: "0 auto" }}>
               Manda tu primera foto y ve lo que tu coach puede hacer por ti.
             </p>

@@ -3,10 +3,10 @@ import "./globals.css";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: { default: `${site.name} en WhatsApp`, template: `%s · ${site.shortName}` },
+  title: { default: `${site.name}: tu coach de nutrición con IA en WhatsApp`, template: `%s · ${site.shortName}` },
   description:
     "Tu coach de nutrición y ejercicio con IA, directo en WhatsApp. Estima calorías con una foto, resuelve tus dudas de comida y te acompaña todos los días. No sustituye a un profesional de la salud.",
-  openGraph: { title: `${site.name} en WhatsApp`, locale: "es_419", type: "website" },
+  openGraph: { title: `${site.name}: tu coach de nutrición con IA en WhatsApp`, siteName: site.name, locale: "es_419", type: "website" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
