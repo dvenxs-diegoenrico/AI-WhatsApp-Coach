@@ -74,6 +74,10 @@ The coach is Claude with **tools**: it logs meals (text or photo), weight and wo
 - `lib/ai/prompts.ts`: stable expert instructions (cached) + per-user context (profile, targets, today's log, notes, weekly check-in).
 - Evidence and decisions: [docs/COACH_KNOWLEDGE.md](docs/COACH_KNOWLEDGE.md).
 
+**Habits and vices:** `log_habit` / `set_focus_habits` track steps, water, sleep, alcohol, cigarettes and sodas in `daily_metrics`; the coach knows NWCR/DPP maintenance habits, if-then plans, alcohol and smoking guidance.
+
+**Steps:** iPhone → the user writes `PASOS`, opens `/conectar-pasos` and sets up an Apple **Shortcuts** automation that POSTs the day's steps from Apple Health to `/api/health/steps?t=<personal signed token>` (revocable with `users.steps_token_version`). Android → screenshot of the step counter (read by the vision model) or text, since Google Fit's web APIs end in 2026 and Health Connect needs an installed app.
+
 **Dashboard:** the user writes `PANEL` → personal 7-day link → 30-day session cookie → `/panel` (today ring and macros, meals with photos, week calories, weight trend, consistency, plan). Example with fake data: `/panel/demo`.
 
 ## Roadmap

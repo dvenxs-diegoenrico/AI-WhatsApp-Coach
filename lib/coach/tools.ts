@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/lib/supabase/server";
 import type { UserRow } from "@/lib/supabase/types";
 import { MIN_AGE } from "@/lib/safety/limits";
+import { dayFor, recentMetrics, saveMetric } from "./habits";
 import { getProgress, insertMeal, insertWeight, insertWorkout, lastMeal, latestWeight, missingProfileFields, recomputeTargets, targetsOf } from "./data";
 
 export const COACH_TOOLS: Anthropic.Tool[] = [
@@ -107,6 +108,37 @@ export const COACH_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
+    name: "log_habit",
+    description:
+      "Record a daily habit or vice: steps (pasos), water in ml (agua_ml), hours of sleep (sueno_h), alcoholic drinks (alcohol_bebidas), cigarettes (cigarros), sugary drinks/glasses of soda (refrescos). " +
+      "Use mode 'add' for things counted during the day (a beer, a glass of water) and 'set' for totals (steps of the day, hours slept). " +
+      "Also use it (pasos, set) when the user sends a screenshot of their step counter.",
+    input_schema: {
+      type: "object",
+      properties: {
+        metric: { type: "string", enum: ["pasos", "agua_ml", "sueno_h", "alcohol_bebidas", "cigarros", "refrescos"] },
+        value: { type: "number" },
+        mode: { type: "string", enum: ["set", "add"] },
+        day: { type: "string", enum: ["hoy", "ayer"], description: "Default hoy. Sleep usually refers to last night → hoy." },
+      },
+      required: ["metric", "value", "mode"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_focus_habits",
+    description:
+      "Save the 1–3 habits the user agreed to work on (e.g. drink more water, sleep 7 h, fewer sodas, quit smoking). Only after they agree.",
+    input_schema: {
+      type: "object",
+      properties: {
+        habits: { type: "array", items: { type: "string", enum: ["pasos", "agua_ml", "sueno_h", "alcohol_bebidas", "cigarros", "refrescos"] }, maxItems: 3 },
+      },
+      required: ["habits"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "save_coach_note",
     description:
       "Remember something important for future conversations: injuries, schedule, preferences, what motivates them, a small commitment they made. One short sentence.",
@@ -170,6 +202,15 @@ const schemas = {
   }),
   get_progress: z.object({}).passthrough(),
   save_coach_note: z.object({ note: z.string().min(1).max(300) }),
+  log_habit: z.object({
+    metric: z.enum(["pasos", "agua_ml", "sueno_h", "alcohol_bebidas", "cigarros", "refrescos"]),
+    value: z.number().finite().min(0).max(100000),
+    mode: z.enum(["set", "add"]),
+    day: z.enum(["hoy", "ayer"]).optional(),
+  }),
+  set_focus_habits: z.object({
+    habits: z.array(z.enum(["pasos", "agua_ml", "sueno_h", "alcohol_bebidas", "cigarros", "refrescos"])).max(3),
+  }),
 };
 
 type ToolName = keyof typeof schemas;
@@ -306,6 +347,28 @@ const handlers: { [K in ToolName]: (ctx: ToolContext, input: z.infer<(typeof sch
     };
     if (ctx.user.restricted_mode) return { ...base, note: "general guidance only: no calorie or macro numbers" };
     return { ...base, today_total: p.todayTotals, last_7_days_kcal: p.days.map((d) => ({ date: d.date, kcal: d.kcal, protein: d.protein })), targets: targetsOf(ctx.user) };
+  },
+
+  async log_habit(ctx, input) {
+    const fromPhoto = Boolean(ctx.photoId) && input.metric === "pasos";
+    if (fromPhoto) ctx.photoId = null; // a step screenshot is not a meal
+    const day = dayFor(input.day, ctx.user.timezone);
+    const value = await saveMetric(ctx.user.id, day, input.metric, input.value, input.mode, fromPhoto ? "foto" : "chat");
+    const week = await recentMetrics(ctx.user.id, ctx.user.timezone, 7);
+    const series = week.map((d) => d.values[input.metric] ?? null);
+    return {
+      saved: true,
+      day,
+      total_that_day: value,
+      last_7_days: series,
+      steps_target: input.metric === "pasos" ? ctx.user.steps_target ?? 8000 : undefined,
+    };
+  },
+
+  async set_focus_habits(ctx, input) {
+    await db().from("users").update({ focus_habits: input.habits }).eq("id", ctx.user.id);
+    ctx.user = { ...ctx.user, focus_habits: input.habits };
+    return { saved: true, focus_habits: input.habits };
   },
 
   async save_coach_note(ctx, input) {

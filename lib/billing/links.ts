@@ -4,7 +4,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
  * Signed links sent in WhatsApp (pay / manage subscription). The link says which user it is for
  * and expires, and nobody can change it without the secret. No login or password needed.
  */
-export type LinkPurpose = "pay" | "portal" | "panel" | "session";
+export type LinkPurpose = "pay" | "portal" | "panel" | "session" | "steps";
 
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 const unb64 = (s: string) => Buffer.from(s, "base64url").toString();
@@ -36,3 +36,5 @@ export const PAY_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PORTAL_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 export const PANEL_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** The iPhone Shortcut link lasts 2 years; it can be revoked by bumping users.steps_token_version. */
+export const STEPS_LINK_TTL_MS = 730 * 24 * 60 * 60 * 1000;

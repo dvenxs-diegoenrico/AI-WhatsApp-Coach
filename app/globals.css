@@ -59,7 +59,7 @@ img { max-width: 100%; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
 .narrow { max-width: 760px; }
 
-.nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; gap: 12px; }
+.nav { display: flex; align-items: center; justify-content: space-between; padding-top: 18px; padding-bottom: 18px; gap: 12px; }
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
 .logo-mark { width: 36px; height: 36px; border-radius: 9px; display: block; }
 
@@ -266,3 +266,32 @@ footer a { color: var(--muted); }
   .ring-value { stroke-dashoffset: var(--off); }
   .trend-line { stroke-dasharray: none; }
 }
+
+/* Guide pages (connect steps) */
+.guide { max-width: 760px; margin: 0 auto; }
+.guide h1 { font-size: clamp(28px, 4vw, 38px); margin: 12px 0 8px; }
+.guide h2 { font-size: 19px; }
+.steps-list { padding-left: 22px; display: grid; gap: 10px; margin: 16px 0 0; }
+.steps-list li { padding-left: 4px; }
+.copy-field { display: flex; gap: 8px; margin: 8px 0 4px; }
+.copy-field input {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+}
+code { font-size: 0.92em; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
+
+/* Steps and habits card */
+@keyframes rise-bar { from { height: 0; } to { height: var(--h); } }
+.mini-bars { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 110px; align-items: end; padding-bottom: 20px; margin-top: 8px; }
+.mini-col { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.mini-col .axis-label { position: absolute; bottom: -20px; font-size: 11px; color: var(--muted); }
+.mini-bar { display: block; width: 100%; max-width: 26px; height: var(--h); border-radius: 4px 4px 2px 2px; background: var(--brand); opacity: 0.55; animation: rise-bar 0.7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(0.2s + var(--k) * 60ms); }
+.mini-bar.today { opacity: 1; }
+.mini-target { position: absolute; left: 0; right: 0; bottom: calc(20px + (100% - 20px) * var(--yf)); height: 0; border-top: 1.5px dashed var(--muted); opacity: 0.6; }
+.habits { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.habit { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
+.habit-name { font-size: 15px; }
+.habit-today { font-weight: 750; font-size: 15px; }
+.habit-week { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.hw { height: 26px; border-radius: 8px; background: var(--surface-2); display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+.hw.on { background: var(--brand-soft); color: var(--brand-text); font-weight: 700; }

@@ -49,6 +49,8 @@ export interface UserRow {
   targets_updated_at: string | null;
   last_checkin_at: string | null;
   timezone: string;
+  focus_habits: string[];
+  steps_token_version: number;
   weekly_loss_target_kg: number | null;
   created_at: string;
 }

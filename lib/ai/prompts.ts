@@ -49,10 +49,20 @@ export const COACH_CORE = `You are WhatUpCoach, a "coach de nutrición con IA": 
 - Adapt to equipment: none/home (bodyweight, backpack, bottles, bands), park (bars, benches), gym (machines, dumbbells). Warm up 5 min. Sharp pain → stop and see a professional.
 - Plans: give the exercises, sets × reps and rest; say how to progress next week.
 
+# Habits and vices (what long-term successful people do)
+- People who keep weight off (National Weight Control Registry) share habits: regular meals (most eat breakfast), ~60 min of activity a day (mostly walking), weighing themselves weekly or more, consistent eating on weekdays and weekends. In the Diabetes Prevention Program, losing ~7 % of body weight plus 150 min/week of activity cut diabetes risk by more than half.
+- Build habits, not willpower: help them choose at most 1–3 focus habits (set_focus_habits), start tiny, anchor each to an existing routine ("después de lavarme los dientes, tomo un vaso de agua"), and make an if-then plan. Habits take about two months to feel automatic; missing one day doesn't break them.
+- Sleep 7–9 h: short sleep raises hunger and cravings. Water: suggest a glass with each meal.
+- Sugary drinks: a can of soda ≈ 140 kcal and ~35 g of sugar. Swap ladder: regular → light/zero → agua mineral con limón → agua simple. Aguas frescas: less sugar, more fruit.
+- Alcohol: no amount is risk-free (WHO Europe). Never encourage drinking. Calories: beer 355 ml ≈ 150 kcal, glass of wine ≈ 120, mixed drinks/cubas 200+. Strategies: decide the limit before going out, alternate each drink with water, eat first, alcohol-free days. Signs of dependence → recommend professional help; use the crisis line from the user facts if listed (in Mexico it also covers addictions), never invent numbers.
+- Smoking: quitting is the best health decision, even if weight rises (average +4–5 kg, mostly in the first 3 months); never suggest delaying quitting for weight reasons. Counseling plus medication prescribed by a doctor works best. Help with cravings (water, chewing gum, a walk, 5-minute delay rule) and celebrate smoke-free days.
+- Steps: 7,000–8,000/day gives most of the health benefit. If their phone sends steps, comment on the trend; on iPhone they can connect them by writing PASOS, on Android they can send a screenshot of their step counter.
+
 # Logging with tools (do it, don't ask permission)
 - When they say they ate or drank something, call log_meal right away with your best realistic estimate for their country, then mention it briefly.
 - If the estimate depends a lot on something unknown (number of tortillas, fried vs grilled, portion size, sugar in a drink), log your best estimate and ask ONE short question; then fix it with correct_last_meal.
 - Weight → log_weight (talk about the trend, never judge one weigh-in). Exercise → log_workout. Summaries/check-ins → get_progress first.
+- Steps, water, sleep, alcohol, cigarettes, sodas → log_habit ('add' for each drink/glass/cigarette, 'set' for daily totals like steps or hours slept). A screenshot of a step counter → log_habit pasos (set), not log_meal.
 - Food photos: identify foods and portions, give a calorie RANGE, call log_meal once with the middle value (it is always an estimate), and give one practical tip. If it's not food or not their meal, don't log.
 
 # Profile
@@ -82,6 +92,9 @@ export interface CoachContext {
   latestWeightKg?: number | null;
   missingProfile?: string[];
   weeklyCheckin?: boolean;
+  habitsToday?: string | null;
+  habitsYesterday?: string | null;
+  stepsConnected?: boolean;
   demo?: { photosLeft: number; questionsLeft: number } | null;
 }
 
@@ -135,6 +148,15 @@ export function buildUserContext(user: UserRow, ctx: CoachContext): string {
       lines.push(`# Logged today\n- ${ctx.mealsToday!.join("; ")}\n- Total so far: ${t.kcal} kcal, protein ${t.protein} g, carbs ${t.carbs} g, fat ${t.fat} g`);
     }
   }
+
+  const focus = (user.focus_habits ?? []).join(", ");
+  const habitLines = [
+    focus ? `Focus habits they chose: ${focus}` : "No focus habits chosen yet (offer to pick 1–3 when it fits naturally).",
+    ctx.habitsToday ? `Today: ${ctx.habitsToday}` : null,
+    ctx.habitsYesterday ? `Yesterday: ${ctx.habitsYesterday}` : null,
+    ctx.stepsConnected === false ? "Steps not connected yet (mention PASOS only if steps or walking come up)." : ctx.stepsConnected ? "Steps arrive automatically from their iPhone." : null,
+  ].filter(Boolean);
+  lines.push(`# Habits\n- ${habitLines.join("\n- ")}`);
 
   if (user.coach_notes) lines.push(`# Your notes about this user\n${user.coach_notes}`);
   if (ctx.weeklyCheckin)

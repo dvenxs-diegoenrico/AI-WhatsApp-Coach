@@ -12,6 +12,11 @@ export function panelLink(userId: string): string {
   return `${appUrl()}/panel/entrar?t=${signLink(userId, "panel", linksKey(), PANEL_LINK_TTL_MS)}`;
 }
 
+/** Personal page with the iPhone Shortcut instructions and link (same 7-day token as the panel). */
+export function connectStepsLink(userId: string): string {
+  return `${appUrl()}/conectar-pasos?t=${signLink(userId, "panel", linksKey(), PANEL_LINK_TTL_MS)}`;
+}
+
 export function newSessionToken(userId: string): string {
   return signLink(userId, "session", linksKey(), SESSION_TTL_MS);
 }

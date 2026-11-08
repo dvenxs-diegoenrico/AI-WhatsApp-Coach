@@ -2,7 +2,9 @@
  * Everything the dashboard shows, in one plain object (easy to render, test and fake for the demo).
  */
 import type { UserRow } from "@/lib/supabase/types";
+import { db } from "@/lib/supabase/server";
 import { getProgress, latestWeight, missingProfileFields, targetsOf, type Progress } from "./data";
+import { recentMetrics, type Metric, type MetricDay } from "./habits";
 
 export interface DashboardData {
   name: string | null;
@@ -21,14 +23,27 @@ export interface DashboardData {
   activeDays: boolean[]; // last 7 days, oldest first
   missingProfile: string[];
   personality: string | null;
+  habits: { focus: Metric[]; days: Array<MetricDay & { label: string }>; stepsTarget: number; stepsConnected: boolean };
 }
 
 const dayLabel = (date: string) =>
   new Intl.DateTimeFormat("es-MX", { weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)).replace(".", "");
 
 export async function loadDashboard(user: UserRow): Promise<DashboardData> {
-  const [p, weight] = await Promise.all([getProgress(user, { withPhotoUrls: true }), latestWeight(user.id)]);
-  return toDashboard(user, p, weight);
+  const [p, weight, metricDays, auto] = await Promise.all([
+    getProgress(user, { withPhotoUrls: true }),
+    latestWeight(user.id),
+    recentMetrics(user.id, user.timezone, 7),
+    db().from("daily_metrics").select("id").eq("user_id", user.id).eq("source", "atajo_ios").limit(1),
+  ]);
+  const d = toDashboard(user, p, weight);
+  d.habits = {
+    focus: (user.focus_habits ?? []) as Metric[],
+    days: metricDays.map((m) => ({ ...m, label: dayLabel(m.day) })),
+    stepsTarget: user.steps_target ?? 8000,
+    stepsConnected: (auto.data?.length ?? 0) > 0,
+  };
+  return d;
 }
 
 export function toDashboard(user: UserRow, p: Progress, weight: number | null): DashboardData {
@@ -68,6 +83,7 @@ export function toDashboard(user: UserRow, p: Progress, weight: number | null): 
     activeDays: p.days.map((d) => activeSet.has(d.date)),
     missingProfile: missingProfileFields(user, weight),
     personality: user.personality,
+    habits: { focus: [], days: [], stepsTarget: user.steps_target ?? 8000, stepsConnected: false },
   };
 }
 
@@ -133,5 +149,15 @@ export function demoDashboard(): DashboardData {
     activeDays: [true, true, false, true, true, true, true],
     missingProfile: [],
     personality: "balanceado",
+    habits: {
+      focus: ["agua_ml", "sueno_h", "refrescos"],
+      days: [6400, 9100, 5200, 8300, 10400, 7600, 6900].map((pasos, i) => ({
+        day: iso(6 - i),
+        label: dayLabel(iso(6 - i)),
+        values: { pasos, agua_ml: [1500, 2000, 1750, 2250, 2000, 2500, 1500][i], sueno_h: [6.5, 7, 6, 7.5, 8, 7, 7.5][i], refrescos: [2, 1, 1, 0, 1, 0, 0][i] },
+      })),
+      stepsTarget: 8000,
+      stepsConnected: true,
+    },
   };
 }

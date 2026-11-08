@@ -1,5 +1,6 @@
 import type { DashboardData } from "@/lib/coach/dashboard";
 import { insights } from "@/lib/coach/dashboard";
+import { METRICS, type Metric } from "@/lib/coach/habits";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX").format(Math.round(n));
 const MEAL_ICON: Record<string, string> = { desayuno: "🌅", comida: "🍽️", cena: "🌙", colacion: "🍎", otro: "🥤" };
@@ -115,6 +116,20 @@ export function Dashboard({ data, demo = false }: { data: DashboardData; demo?: 
             )}
           </section>
         )}
+
+        <section className="dash-card" {...card()} aria-labelledby="habits-title">
+          <h2 id="habits-title">Pasos y hábitos</h2>
+          <StepsCard habits={data.habits} />
+          {data.habits.focus.length > 0 ? (
+            <ul className="habits">
+              {data.habits.focus.map((m) => (
+                <HabitRow key={m} metric={m} days={data.habits.days} />
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">Pídele a tu coach que te ayude a elegir 1 a 3 hábitos (agua, sueño, menos refrescos…) y aquí verás tu avance.</p>
+          )}
+        </section>
 
         <section className="dash-card" {...card()} aria-labelledby="move-title">
           <h2 id="move-title">Constancia</h2>
@@ -289,5 +304,64 @@ function WeekDots({ days, active }: { days: DashboardData["days"]; active: boole
         </li>
       ))}
     </ol>
+  );
+}
+
+const fmtMetric = (m: Metric, v: number) =>
+  m === "agua_ml" ? `${(v / 1000).toFixed(1)} L` : m === "sueno_h" ? `${v} h` : new Intl.NumberFormat("es-MX").format(v);
+
+function StepsCard({ habits }: { habits: DashboardData["habits"] }) {
+  const today = habits.days.at(-1)?.values.pasos;
+  const series = habits.days.map((d) => d.values.pasos ?? 0);
+  if (!series.some(Boolean)) {
+    return (
+      <p className="muted">
+        👟 Aún no hay pasos. En iPhone conéctalos en <a href="/conectar-pasos">2 minutos</a>; en Android manda a tu coach una captura de tu contador.
+      </p>
+    );
+  }
+  const max = Math.max(habits.stepsTarget * 1.2, ...series);
+  return (
+    <div className="steps">
+      <p className="dash-big">
+        {today !== undefined ? fmtMetric("pasos", today) : "—"} <small>pasos hoy</small>
+      </p>
+      <div className="mini-bars" role="img" aria-label="Pasos de los últimos 7 días">
+        <span className="mini-target" style={{ "--yf": habits.stepsTarget / max } as React.CSSProperties} aria-hidden />
+        {habits.days.map((d, k) => (
+          <span key={d.day} className="mini-col" title={`${d.label}: ${d.values.pasos ? fmtMetric("pasos", d.values.pasos) : "sin dato"} pasos`}>
+            <span className={`mini-bar${k === habits.days.length - 1 ? " today" : ""}`} style={{ "--h": `${((d.values.pasos ?? 0) / max) * 100}%`, "--k": k } as React.CSSProperties} />
+            <span className="axis-label">{d.label}</span>
+          </span>
+        ))}
+      </div>
+      <p className="dash-foot">
+        Meta {fmtMetric("pasos", habits.stepsTarget)} · {habits.stepsConnected ? "llegan solos desde tu iPhone ✓" : <a href="/conectar-pasos">conectar mi iPhone</a>}
+      </p>
+    </div>
+  );
+}
+
+function HabitRow({ metric, days }: { metric: Metric; days: DashboardData["habits"]["days"] }) {
+  const info = METRICS[metric];
+  const today = days.at(-1)?.values[metric];
+  return (
+    <li className="habit">
+      <span className="habit-name">
+        <span aria-hidden>{info.emoji}</span> {info.label}
+        <span className="muted">{info.better === "less" ? " · menos es mejor" : ""}</span>
+      </span>
+      <span className="habit-today">{today !== undefined ? fmtMetric(metric, today) : "—"}</span>
+      <span className="habit-week" aria-label={`Últimos 7 días de ${info.label.toLowerCase()}`}>
+        {days.map((d) => {
+          const v = d.values[metric];
+          return (
+            <span key={d.day} className={`hw${v !== undefined ? " on" : ""}`} title={`${d.label}: ${v !== undefined ? fmtMetric(metric, v) : "sin dato"}`}>
+              {v !== undefined ? (metric === "agua_ml" ? (v / 1000).toFixed(1) : v) : ""}
+            </span>
+          );
+        })}
+      </span>
+    </li>
   );
 }

@@ -8,8 +8,9 @@ import { prepareImage } from "@/lib/ai/image";
 import { addCosts, type Cost } from "@/lib/ai/pricing";
 import { buildUserContext, COACH_CORE, PHOTO_INSTRUCTIONS, PHOTO_INSTRUCTIONS_RESTRICTED, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
 import { COACH_TOOLS, runTool, type ToolContext } from "@/lib/coach/tools";
-import { panelLink } from "@/lib/auth/session";
+import { connectStepsLink, panelLink } from "@/lib/auth/session";
 import { getProgress, latestWeight, missingProfileFields } from "@/lib/coach/data";
+import { describeDay, recentMetrics } from "@/lib/coach/habits";
 import { screenMessage } from "@/lib/safety/screening";
 import { filterReply, labelAsEstimate } from "@/lib/safety/output-filter";
 import { t } from "@/lib/i18n/es";
@@ -103,6 +104,11 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
     return;
   }
 
+  if (command === "steps") {
+    if (user.onboarding_step !== "done") return void (await reply(user, `${t.finishOnboardingFirst}\n\n${currentQuestion(user.onboarding_step)}`));
+    await reply(user, t.stepsConnect(connectStepsLink(user.id)));
+    return;
+  }
   if (command === "panel") {
     if (user.onboarding_step !== "done") return void (await reply(user, `${t.finishOnboardingFirst}\n\n${currentQuestion(user.onboarding_step)}`));
     await reply(user, t.panelLink(panelLink(user.id)));
@@ -356,7 +362,12 @@ async function handlePhoto(
 
 /** What the coach should know this turn: profile, targets, today's log, notes, check-in. */
 async function coachContext(user: UserRow, demoKind: "text" | "photo" | null): Promise<string> {
-  const [weight, progress] = await Promise.all([latestWeight(user.id), getProgress(user)]);
+  const [weight, progress, habitDays, stepsAuto] = await Promise.all([
+    latestWeight(user.id),
+    getProgress(user),
+    recentMetrics(user.id, user.timezone, 2),
+    db().from("daily_metrics").select("id").eq("user_id", user.id).eq("source", "atajo_ios").limit(1),
+  ]);
 
   // Weekly check-in: at most once every 7 days, after the first week, only if they've been logging.
   const firstWeekDone = Date.now() - Date.parse(user.created_at) > 7 * 86_400_000;
@@ -382,6 +393,9 @@ async function coachContext(user: UserRow, demoKind: "text" | "photo" | null): P
     missingProfile: missingProfileFields(user, weight),
     weeklyCheckin,
     demo: demoLeftNow,
+    habitsYesterday: describeDay(habitDays[0]?.values ?? {}) || null,
+    habitsToday: describeDay(habitDays[1]?.values ?? {}) || null,
+    stepsConnected: (stepsAuto.data?.length ?? 0) > 0,
   });
 }
 
