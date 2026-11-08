@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   const messages = parseWebhook(payload, env.WHATSAPP_PHONE_NUMBER_ID);
+  console.log(`WhatsApp webhook: ${describe(payload)} → ${messages.length} message(s) to handle`);
   if (messages.length > 0) {
     // In parallel: when Meta batches several messages, each is stored right away,
     // so the short reply delay can group them into a single answer.
@@ -59,4 +60,19 @@ export async function POST(req: NextRequest) {
   }
 
   return new Response("OK", { status: 200 });
+}
+
+/** One log line per delivery, without personal data, to see in Vercel → Logs what Meta sends. */
+function describe(payload: unknown): string {
+  const p = payload as { entry?: Array<{ changes?: Array<{ field?: string; value?: { metadata?: { phone_number_id?: string }; messages?: unknown[]; statuses?: Array<{ status?: string }> } }> }> };
+  const parts: string[] = [];
+  for (const e of p?.entry ?? [])
+    for (const c of e.changes ?? []) {
+      const v = c.value;
+      parts.push(
+        `field=${c.field} phone_id=${v?.metadata?.phone_number_id ?? "?"} messages=${v?.messages?.length ?? 0}` +
+          (v?.statuses?.length ? ` statuses=${v.statuses.map((s) => s.status).join(",")}` : ""),
+      );
+    }
+  return parts.join(" | ") || "empty";
 }
