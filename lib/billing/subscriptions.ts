@@ -21,7 +21,8 @@ const customerId = (c: string | Stripe.Customer | Stripe.DeletedCustomer) => (ty
 /** Copies a Stripe subscription into our subscriptions table (one row per user). */
 export async function syncSubscription(sub: Stripe.Subscription, userIdHint?: string | null): Promise<string | null> {
   const customer = customerId(sub.customer);
-  const userId = userIdHint ?? sub.metadata?.user_id ?? (await userIdForCustomer(customer));
+  // Stripe best practice: map through the object graph (Customer → our user), metadata only as a last resort.
+  const userId = (await userIdForCustomer(customer)) ?? userIdHint ?? sub.metadata?.user_id ?? null;
   if (!userId) {
     console.warn(`Stripe subscription ${sub.id} has no matching user`);
     return null;

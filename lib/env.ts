@@ -42,6 +42,11 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_MONTHLY: z.string().optional(),
   STRIPE_PRICE_YEARLY: z.string().optional(),
+  // "true" only after you add an active tax registration in Stripe (Dashboard → Tax → Locations)
+  STRIPE_AUTOMATIC_TAX: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
 
   // Public address of the app, used in payment links. Optional on Vercel (it uses the production domain).
   APP_URL: z.string().url().optional(),

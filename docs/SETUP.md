@@ -161,6 +161,8 @@ The token from 4b dies after 24 h. Replace it with one that doesn't expire:
 
 ---
 
+> **Plan completo de Stripe (Billing, Invoicing, Tax), basado en las guías oficiales de Stripe: [docs/STRIPE_PLAN.md](STRIPE_PLAN.md).** Ahí está la clave restringida recomendada, la lista completa de eventos del webhook, los impuestos y la factura (CFDI).
+
 ## 7. Stripe (payments): 30 min
 
 How it works: after signing up, each user gets a **free demo** (1 photo + 3 questions, no card). Then the bot sends a link to choose a plan → Stripe Checkout → **3-day trial with card required** → subscription. `MI CUENTA` in WhatsApp opens the Stripe portal (change plan, update card, cancel).
@@ -178,7 +180,7 @@ Use **Test mode** (toggle at the top) until launch.
 3. **Developers → API keys → Secret key** (`sk_test_…`).
 4. **Developers → Webhooks → Add endpoint**
    - URL: `https://YOUR-DOMAIN/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+   - Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`
    - After saving, copy the **Signing secret** (`whsec_…`).
 5. **Settings → Billing → Customer portal** → **Activate**. Allow: update payment method, cancel subscriptions (at end of period), and switch plans between your two prices.
 6. **Settings → Billing → Subscriptions and emails → Manage failed payments**: after all retries fail, **cancel the subscription**. Turn on the emails for failed payments and receipts.
