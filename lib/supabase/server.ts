@@ -10,7 +10,8 @@ let client: SupabaseClient | undefined;
 export function db(): SupabaseClient {
   if (client) return client;
   const env = getEnv();
-  client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  // Accept a pasted URL with extra path (e.g. ".../rest/v1/" or a trailing slash): keep only the origin.
+  client = createClient(new URL(env.SUPABASE_URL).origin, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return client;
