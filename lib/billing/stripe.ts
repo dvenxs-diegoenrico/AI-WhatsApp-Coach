@@ -34,7 +34,7 @@ export function planForPrice(priceId: string | null | undefined): Plan | null {
   return null;
 }
 
-/** Public base URL for links (e.g. https://whatsupcoach.vercel.app). */
+/** Public base URL for links (e.g. https://whatupcoach.vercel.app). */
 export function appUrl(): string {
   const e = getEnv();
   if (e.APP_URL) return e.APP_URL.replace(/\/$/, "");
