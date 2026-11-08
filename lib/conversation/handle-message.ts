@@ -9,6 +9,7 @@ import { addCosts, type Cost } from "@/lib/ai/pricing";
 import { buildUserContext, COACH_CORE, PHOTO_INSTRUCTIONS, PHOTO_INSTRUCTIONS_RESTRICTED, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
 import { COACH_TOOLS, runTool, type ToolContext } from "@/lib/coach/tools";
 import { connectStepsLink, panelLink } from "@/lib/auth/session";
+import { simulation } from "@/lib/sim/context";
 import { getProgress, latestWeight, missingProfileFields } from "@/lib/coach/data";
 import { describeDay, recentMetrics } from "@/lib/coach/habits";
 import { screenMessage } from "@/lib/safety/screening";
@@ -233,7 +234,7 @@ async function withinLimits(user: UserRow, isPhoto: boolean): Promise<boolean> {
 async function handleChat(user: UserRow, current: MessageRow, notice: string | null, demo = false): Promise<void> {
   // Wait a moment: if the user keeps typing, only the last message's handler answers, covering all of them.
   // 3 quick messages → 1 AI call and 1 WhatsApp message instead of 3.
-  const debounce = getEnv().REPLY_DEBOUNCE_MS;
+  const debounce = simulation.current() ? 0 : getEnv().REPLY_DEBOUNCE_MS;
   if (debounce > 0) {
     await sleep(debounce);
     const latest = await db()
@@ -530,7 +531,7 @@ export function toTurns(rows: Array<{ direction: "in" | "out"; body: string | nu
   return turns;
 }
 
-async function deleteAllUserData(user: UserRow): Promise<void> {
+export async function deleteAllUserData(user: UserRow): Promise<void> {
   // 1) Photo files in storage (rows are removed by the cascade below).
   const bucket = db().storage.from(PHOTOS_BUCKET);
   for (;;) {
