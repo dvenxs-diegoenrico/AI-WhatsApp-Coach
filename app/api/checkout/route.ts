@@ -5,8 +5,12 @@ import { verifyLink } from "@/lib/billing/links";
 import { appUrl, billingEnabled, linksKey, priceFor, stripe, type Plan } from "@/lib/billing/stripe";
 import { getSubscription } from "@/lib/billing/subscriptions";
 import { site } from "@/lib/site";
+import { getEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
+
+/** Tags our sessions in the Stripe Dashboard (Checkout → filter by integration). */
+const INTEGRATION_ID = "whatupcoach-suscripcion-qkmvrtla";
 export const dynamic = "force-dynamic";
 
 /** GET /api/checkout?t=<signed link>&plan=mensual|anual → creates a Stripe Checkout and redirects to it. */
@@ -29,6 +33,9 @@ export async function GET(req: NextRequest) {
   }
 
   const trial = !u.trial_used_at;
+  // Stripe Tax: only when you have an active tax registration in Stripe (see docs/STRIPE_PLAN.md).
+  // Prices are IVA-inclusive, so the customer still pays $199 / $1,490 and the tax is shown inside it.
+  const tax = getEnv().STRIPE_AUTOMATIC_TAX;
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: priceFor(plan), quantity: 1 }],
@@ -42,6 +49,13 @@ export async function GET(req: NextRequest) {
     payment_method_collection: "always", // card required even for the free trial
     locale: "es-419",
     allow_promotion_codes: true,
+    integration_identifier: INTEGRATION_ID,
+    ...(tax
+      ? {
+          automatic_tax: { enabled: true },
+          ...(existing?.stripe_customer_id ? { customer_update: { address: "auto" as const }, billing_address_collection: "required" as const } : {}),
+        }
+      : {}),
     success_url: `${appUrl()}/gracias`,
     cancel_url: back,
   });
