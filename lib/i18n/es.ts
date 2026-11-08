@@ -48,7 +48,14 @@ export const t = {
 
   onboardingDone: (personality: string) =>
     `¡Listo! Voy a ser tu coach en modo *${personality}*.\n\n` +
-    "Cuéntame: ¿cuál es tu meta principal? Puedes preguntarme lo que quieras sobre comida y ejercicio, o mandarme una foto de tu comida 📸 para estimar sus calorías.",
+    "Para armar tu plan necesito conocerte un poco: ¿cuánto mides, cuánto pesas y qué te gustaría lograr (bajar grasa, mantenerte o ganar músculo)?\n\n" +
+    "También puedes preguntarme lo que quieras o mandarme una foto de tu comida 📸.",
+  stepsConnect: (link: string) =>
+    "👟 *Conecta tus pasos*\n\n" +
+    "📱 *iPhone:* abre este enlace y sigue los pasos (3 min, una sola vez). Cada noche tu iPhone me mandará tus pasos solo 👉 " + link + "\n\n" +
+    "🤖 *Android:* mándame una *captura de tu contador de pasos* o escríbeme cuántos caminaste.",
+  panelLink: (link: string) =>
+    `📊 Aquí está tu panel con tus comidas, tu peso y tu constancia 👉 ${link}\n_El enlace es personal: no lo compartas. Funciona 7 días._`,
 
   finishOnboardingFirst: "Primero terminemos tu registro 🙂",
 

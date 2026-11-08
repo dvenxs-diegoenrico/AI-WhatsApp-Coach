@@ -98,6 +98,33 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Panel + commands */}
+        <section>
+          <div className="wrap">
+            <h2>Tu progreso, de un vistazo</h2>
+            <div className="grid-2" style={{ marginTop: 20 }}>
+              <div className="card">
+                <div className="icon" aria-hidden>📊</div>
+                <h3>Panel personal</h3>
+                <p>
+                  Escribe <b>PANEL</b> en el chat y abre tu enlace: calorías y proteína del día, tu tendencia de peso, tus
+                  entrenamientos y tu constancia. Sin contraseñas. <a href="/panel/demo">Ver un ejemplo</a>.
+                </p>
+              </div>
+              <div className="card">
+                <div className="icon" aria-hidden>💬</div>
+                <h3>Comandos útiles</h3>
+                <ul className="checks">
+                  <li><b>PANEL</b>: tu progreso en la web</li>
+                  <li><b>MI CUENTA</b>: plan, tarjeta o cancelar</li>
+                  <li><b>BORRAR MIS DATOS</b>: elimina todo</li>
+                  <li><b>ALTO</b>: deja de recibir recordatorios</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ */}
         <section>
           <div className="wrap narrow">

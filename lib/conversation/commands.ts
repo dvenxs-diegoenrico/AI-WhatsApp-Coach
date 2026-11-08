@@ -1,6 +1,6 @@
 import { normalize } from "@/lib/safety/normalize";
 
-export type Command = "delete_request" | "delete_confirm" | "stop_reminders" | "account";
+export type Command = "delete_request" | "delete_confirm" | "stop_reminders" | "account" | "panel" | "steps";
 
 /** Commands only trigger when they are the whole message (so normal chat isn't misread). */
 export function detectCommand(text: string): Command | null {
@@ -9,6 +9,8 @@ export function detectCommand(text: string): Command | null {
   if (/^(confirmo|si confirmo) borrar$/.test(n)) return "delete_confirm";
   if (/^(alto|stop|baja|ya no me mandes recordatorios|no mas recordatorios|detener recordatorios|cancelar recordatorios)$/.test(n))
     return "stop_reminders";
+  if (/^(pasos|conectar pasos|conectar mis pasos|mis pasos|conectar salud|apple health)$/.test(n)) return "steps";
+  if (/^(panel|mi panel|progreso|mi progreso|ver mi progreso|dashboard|resumen)$/.test(n)) return "panel";
   if (/^(mi cuenta|cuenta|mi suscripcion|suscripcion|planes|pagar|suscribirme|cancelar suscripcion|cancelar mi suscripcion)$/.test(n))
     return "account";
   return null;
