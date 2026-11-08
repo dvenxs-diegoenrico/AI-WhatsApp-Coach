@@ -6,7 +6,7 @@ export function Header() {
   return (
     <header className="wrap nav">
       <Link href="/" className="logo" aria-label={site.name}>
-        <span className="logo-mark" aria-hidden>🥗</span>
+        <img className="logo-mark" src="/brand/whatupcoach-logo.svg" alt="" width={36} height={36} />
         <span>{site.shortName}</span>
       </Link>
       <WhatsAppButton href={wa} small label="Empezar" />
