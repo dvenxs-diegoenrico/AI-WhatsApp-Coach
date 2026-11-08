@@ -56,6 +56,9 @@ const schema = z.object({
   DEMO_PHOTOS: z.coerce.number().int().min(0).default(1),
   DEMO_QUESTIONS: z.coerce.number().int().min(0).default(3),
 
+  // QA conversation simulator (/api/dev/simulate). Unset = simulator disabled.
+  SIMULATOR_SECRET: z.string().min(24).optional(),
+
   // Vercel Cron (milestone 4, optional for now)
   CRON_SECRET: z.string().optional(),
 });

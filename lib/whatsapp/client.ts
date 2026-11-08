@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { simulation } from "@/lib/sim/context";
 
 const MAX_WHATSAPP_TEXT = 4096;
 
@@ -38,6 +39,11 @@ export function splitForWhatsApp(text: string, max = MAX_WHATSAPP_TEXT - 96): st
 
 /** Sends a text message. Returns the WhatsApp message ids (one per chunk). */
 export async function sendText(waId: string, body: string): Promise<string[]> {
+  const sim = simulation.current();
+  if (sim) {
+    sim.outbox.push(body);
+    return [`sim-out-${Date.now()}-${sim.outbox.length}`];
+  }
   const env = getEnv();
   const ids: string[] = [];
   for (const chunk of splitForWhatsApp(body)) {
@@ -69,7 +75,7 @@ export async function sendText(waId: string, body: string): Promise<string[]> {
 /** Marks the user's message as read (blue ticks) and shows "escribiendo…" while we think. Best effort. */
 export async function markReadWithTyping(messageId: string): Promise<void> {
   const env = getEnv();
-  if (env.WHATSAPP_DRY_RUN) return;
+  if (env.WHATSAPP_DRY_RUN || simulation.current()) return;
   try {
     await fetch(graphUrl(`${env.WHATSAPP_PHONE_NUMBER_ID}/messages`), {
       method: "POST",
@@ -88,6 +94,8 @@ export async function markReadWithTyping(messageId: string): Promise<void> {
 
 /** Downloads a media file (photo or audio) that a user sent. Two steps: get the temporary URL, then the bytes. */
 export async function downloadMedia(mediaId: string): Promise<{ data: Buffer; mimeType: string }> {
+  const simImage = simulation.current()?.images.get(mediaId);
+  if (simImage) return simImage;
   const meta = await fetch(graphUrl(mediaId), { headers: authHeaders() });
   if (!meta.ok) throw new Error(`WhatsApp media lookup failed (${meta.status})`);
   const info = (await meta.json()) as { url: string; mime_type: string };
