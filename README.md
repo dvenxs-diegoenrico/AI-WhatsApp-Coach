@@ -1,10 +1,12 @@
-# AI WhatsApp Coach
+# WhatUpCoach
 
-A *coach de nutrición con IA* (AI nutrition and fitness coach) for Spanish-speaking adults (Latin America, the US, Spain…), starting with Mexico. Users chat with it on WhatsApp, and a small web dashboard comes later.
+**WhatUpCoach** is a *coach de nutrición con IA* (AI nutrition and fitness coach) for Spanish-speaking adults (Latin America, the US, Spain…), starting with Mexico. Users chat with it on WhatsApp, and a small web dashboard comes later.
 
 **Stack:** Next.js (App Router, TypeScript) on Vercel · Supabase (Postgres + Storage) · Meta WhatsApp Cloud API · Claude API · Stripe (milestone 3) · Vercel Cron (milestone 4)
 
-👉 **First time? Follow [docs/SETUP.md](docs/SETUP.md).**
+👉 **First time? Follow [docs/SETUP.md](docs/SETUP.md).** Marketing plan and video scripts: [docs/MARKETING.md](docs/MARKETING.md).
+
+**Website:** `/` landing page (its button opens WhatsApp with "Hola D"), `/privacidad` privacy notice, `/terminos` terms. Configure with the `NEXT_PUBLIC_*` variables in `.env.example`.
 
 ## How a message flows
 
