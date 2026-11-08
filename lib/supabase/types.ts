@@ -23,6 +23,10 @@ export interface UserRow {
   last_inbound_at: string | null;
   message_limit_notice_at: string | null;
   photo_limit_notice_at: string | null;
+  demo_photos_used: number;
+  demo_questions_used: number;
+  trial_used_at: string | null;
+  paywall_notice_at: string | null;
   created_at: string;
 }
 
@@ -36,4 +40,20 @@ export interface MessageRow {
   media_path: string | null;
   model: string | null;
   created_at: string;
+}
+
+export type SubscriptionStatus =
+  | "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "incomplete" | "incomplete_expired" | "paused";
+
+export interface SubscriptionRow {
+  id: string;
+  user_id: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  plan: "mensual" | "anual" | null;
+  status: SubscriptionStatus | null;
+  price_id: string | null;
+  trial_end: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
 }
