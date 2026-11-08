@@ -27,6 +27,29 @@ export interface UserRow {
   demo_questions_used: number;
   trial_used_at: string | null;
   paywall_notice_at: string | null;
+  height_cm: number | null;
+  goal: "bajar" | "mantener" | "subir" | null;
+  activity_level: "sedentario" | "ligero" | "moderado" | "activo" | "muy_activo" | null;
+  goal_weight_kg: number | null;
+  training_days: number | null;
+  equipment: "ninguno" | "casa" | "gimnasio" | "parque" | null;
+  experience: "principiante" | "intermedio" | "avanzado" | null;
+  diet_style: string | null;
+  food_dislikes: string | null;
+  coach_notes: string | null;
+  daily_calorie_target: number | null;
+  tdee_estimate: number | null;
+  protein_target_g: number | null;
+  carbs_target_g: number | null;
+  fat_target_g: number | null;
+  fiber_target_g: number | null;
+  water_target_ml: number | null;
+  steps_target: number | null;
+  targets_method: "ecuacion" | "adaptativo" | null;
+  targets_updated_at: string | null;
+  last_checkin_at: string | null;
+  timezone: string;
+  weekly_loss_target_kg: number | null;
   created_at: string;
 }
 

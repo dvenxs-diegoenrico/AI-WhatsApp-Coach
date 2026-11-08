@@ -65,6 +65,17 @@ npm run simulate -- "Hola A"   # send a signed fake WhatsApp message to localhos
 
 Every AI reply stores `input_tokens`, `output_tokens` and `ai_cost_usd` in `messages`. The `usage_daily` view adds them up per user and day, plus an estimate of the WhatsApp cost.
 
+## Expert coach (milestone 2)
+
+The coach is Claude with **tools**: it logs meals (text or photo), weight and workouts, saves the profile and personal notes, and reads progress. All numbers come from code:
+
+- `lib/coach/nutrition.ts`: Mifflin-St Jeor × activity, 0.5 %/week default loss (max 1 % / 1 kg), protein 1.4–1.6 g/kg (BMI-25 reference weight with obesity), fiber, water, steps; **adaptive expenditure** from the user's own intake and weight trend after ~2 weeks.
+- `lib/coach/tools.ts`: tool definitions + zod validation; restricted users never get numbers.
+- `lib/ai/prompts.ts`: stable expert instructions (cached) + per-user context (profile, targets, today's log, notes, weekly check-in).
+- Evidence and decisions: [docs/COACH_KNOWLEDGE.md](docs/COACH_KNOWLEDGE.md).
+
+**Dashboard:** the user writes `PANEL` → personal 7-day link → 30-day session cookie → `/panel` (today ring and macros, meals with photos, week calories, weight trend, consistency, plan). Example with fake data: `/panel/demo`.
+
 ## Roadmap
 
 1. ✅ **Milestone 1:** scaffold, schema, WhatsApp webhook, onboarding, AI replies, photo estimates, delete command

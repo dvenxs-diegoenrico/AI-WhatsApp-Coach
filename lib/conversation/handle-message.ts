@@ -3,10 +3,13 @@ import { db, PHOTOS_BUCKET } from "@/lib/supabase/server";
 import type { MessageRow, RiskFlag, UserRow } from "@/lib/supabase/types";
 import type { IncomingMessage } from "@/lib/whatsapp/parse";
 import { downloadMedia, markReadWithTyping, sendText } from "@/lib/whatsapp/client";
-import { chatReply, photoReply, transcribeAudio, type AiReply, type ChatTurn } from "@/lib/ai/claude";
+import { chatReply, coachReply, transcribeAudio, type AiReply, type ChatTurn } from "@/lib/ai/claude";
 import { prepareImage } from "@/lib/ai/image";
 import { addCosts, type Cost } from "@/lib/ai/pricing";
-import { buildSystemPrompt, PHOTO_INSTRUCTIONS, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
+import { buildUserContext, COACH_CORE, PHOTO_INSTRUCTIONS, PHOTO_INSTRUCTIONS_RESTRICTED, SAFETY_RETRY_NOTE } from "@/lib/ai/prompts";
+import { COACH_TOOLS, runTool, type ToolContext } from "@/lib/coach/tools";
+import { panelLink } from "@/lib/auth/session";
+import { getProgress, latestWeight, missingProfileFields } from "@/lib/coach/data";
 import { screenMessage } from "@/lib/safety/screening";
 import { filterReply, labelAsEstimate } from "@/lib/safety/output-filter";
 import { t } from "@/lib/i18n/es";
@@ -100,6 +103,11 @@ export async function handleIncoming(msg: IncomingMessage): Promise<void> {
     return;
   }
 
+  if (command === "panel") {
+    if (user.onboarding_step !== "done") return void (await reply(user, `${t.finishOnboardingFirst}\n\n${currentQuestion(user.onboarding_step)}`));
+    await reply(user, t.panelLink(panelLink(user.id)));
+    return;
+  }
   if (command === "account") {
     if (!billingEnabled()) return void (await reply(user, t.billingOff));
     if (user.onboarding_step !== "done") return void (await reply(user, `${t.finishOnboardingFirst}\n\n${currentQuestion(user.onboarding_step)}`));
@@ -237,28 +245,38 @@ async function handleChat(user: UserRow, current: MessageRow, notice: string | n
     if (fresh.data) user = fresh.data as UserRow;
   }
 
-  const system = buildSystemPrompt(user);
   const messages = await loadTurns(user.id, CHAT_HISTORY, "user");
   if (messages.length === 0) return; // already answered (e.g. a webhook retry)
 
+  const ctx: ToolContext = { user };
   let ai: AiReply | null = null;
   let cost: Cost | null = null;
   try {
-    ai = await chatReply(system, messages);
+    const systemUser = await coachContext(user, demo ? "text" : null);
+    ai = await coachReply({
+      kind: "chat",
+      systemCore: COACH_CORE,
+      systemUser,
+      messages,
+      tools: COACH_TOOLS,
+      runTool: (name, input) => runTool(ctx, name, input),
+    });
     cost = ai.cost;
+    user = ctx.user;
     if (ai.refused) return void (await reply(user, withNotice(notice, t.refusal), { model: ai.model, cost }));
 
     let checked = filterReply(ai.text, { sex: user.sex });
     if (!checked.safe) {
+      // Retry WITHOUT tools so nothing gets logged twice.
       console.warn("unsafe reply blocked, retrying", checked.reasons);
-      ai = await chatReply(`${system}\n\n${SAFETY_RETRY_NOTE}`, messages);
+      ai = await chatReply(`${COACH_CORE}\n\n${systemUser}\n\n${SAFETY_RETRY_NOTE}`, messages);
       cost = addCosts(cost, ai.cost);
       checked = filterReply(ai.text, { sex: user.sex });
       if (ai.refused || !checked.safe)
         return void (await reply(user, withNotice(notice, t.unsafeReplyFallback), { model: ai.model, cost }));
     }
 
-    let out = checked.text;
+    let out = checked.text || t.aiError;
     if (user.restricted_mode && !notice && /kcal|calor[ií]a/i.test(out)) out += `\n\n${t.restrictedFooter}`;
     if (demo) out = await consumeDemo(user, "text", out);
     await reply(user, withNotice(notice, out), { model: ai.model, cost });
@@ -291,17 +309,36 @@ async function handlePhoto(
     const path = `${user.id}/${randomUUID()}.jpg`;
     const upload = await db().storage.from(PHOTOS_BUCKET).upload(path, jpeg, { contentType: "image/jpeg" });
     if (upload.error) throw new Error(`photo upload failed: ${upload.error.message}`);
-    await db().from("photos").insert({ user_id: user.id, storage_path: path, wa_media_id: msg.mediaId, mime_type: "image/jpeg", kind: "meal" });
+    const photo = await db()
+      .from("photos")
+      .insert({ user_id: user.id, storage_path: path, wa_media_id: msg.mediaId, mime_type: "image/jpeg", kind: "meal" })
+      .select("id")
+      .single();
     await db().from("messages").update({ media_path: path }).eq("id", inbound.id);
 
-    let instructions = PHOTO_INSTRUCTIONS;
-    if (user.restricted_mode)
-      instructions =
-        "The user sent a photo. Describe the foods you see and give one general healthy-habit tip. Do NOT give calorie or macro numbers.";
+    let instructions = user.restricted_mode ? PHOTO_INSTRUCTIONS_RESTRICTED : PHOTO_INSTRUCTIONS;
     if (msg.caption) instructions += `\n\nThe user's caption: "${msg.caption}"`;
 
     const history = await loadTurns(user.id, PHOTO_HISTORY, "assistant", inbound.id);
-    const ai = await photoReply(buildSystemPrompt(user), history, jpeg.toString("base64"), instructions);
+    const ctx: ToolContext = { user, photoId: (photo.data?.id as string | undefined) ?? null };
+    const ai = await coachReply({
+      kind: "photo",
+      systemCore: COACH_CORE,
+      systemUser: await coachContext(user, demo ? "photo" : null),
+      messages: [
+        ...history,
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpeg.toString("base64") } },
+            { type: "text", text: instructions },
+          ],
+        },
+      ],
+      tools: COACH_TOOLS,
+      runTool: (name, input) => runTool(ctx, name, input),
+    });
+    user = ctx.user;
     if (ai.refused) return void (await reply(user, withNotice(notice, t.refusal), { model: ai.model, cost: ai.cost }));
 
     const checked = filterReply(ai.text, { sex: user.sex });
@@ -315,6 +352,37 @@ async function handlePhoto(
     console.error("photo reply failed", err);
     await reply(user, withNotice(notice, t.aiError));
   }
+}
+
+/** What the coach should know this turn: profile, targets, today's log, notes, check-in. */
+async function coachContext(user: UserRow, demoKind: "text" | "photo" | null): Promise<string> {
+  const [weight, progress] = await Promise.all([latestWeight(user.id), getProgress(user)]);
+
+  // Weekly check-in: at most once every 7 days, after the first week, only if they've been logging.
+  const firstWeekDone = Date.now() - Date.parse(user.created_at) > 7 * 86_400_000;
+  const lastCheckin = user.last_checkin_at ? Date.parse(user.last_checkin_at) : 0;
+  const weeklyCheckin = firstWeekDone && Date.now() - lastCheckin > 7 * 86_400_000 && progress.activeDaysThisWeek >= 2;
+  if (weeklyCheckin) await db().from("users").update({ last_checkin_at: new Date().toISOString() }).eq("id", user.id);
+
+  let demoLeftNow: { photosLeft: number; questionsLeft: number } | null = null;
+  if (demoKind) {
+    const env = getEnv();
+    const left = demoLeft(
+      { photos: user.demo_photos_used + (demoKind === "photo" ? 1 : 0), questions: user.demo_questions_used + (demoKind === "text" ? 1 : 0) },
+      { photos: env.DEMO_PHOTOS, questions: env.DEMO_QUESTIONS },
+    );
+    demoLeftNow = { photosLeft: left.photos, questionsLeft: left.questions };
+  }
+
+  return buildUserContext(user, {
+    now: new Date(),
+    latestWeightKg: weight,
+    todayTotals: progress.todayTotals,
+    mealsToday: progress.todayMeals.map((m) => `${m.meal_type ?? "comida"}: ${m.description}${m.calories ? ` (~${m.calories} kcal)` : ""}`),
+    missingProfile: missingProfileFields(user, weight),
+    weeklyCheckin,
+    demo: demoLeftNow,
+  });
 }
 
 // ---------------------------------------------------------------------------
