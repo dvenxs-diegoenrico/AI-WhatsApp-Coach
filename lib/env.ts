@@ -18,7 +18,10 @@ const schema = z.object({
     .transform((v) => v === "true"),
 
   // Supabase
-  SUPABASE_URL: z.string().url(),
+  SUPABASE_URL: z
+    .string()
+    .url()
+    .refine((u) => new URL(u).hostname.endsWith(".supabase.co"), "must be your project URL, like https://xxxx.supabase.co"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
   // Claude
