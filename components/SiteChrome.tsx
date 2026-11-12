@@ -9,7 +9,12 @@ export function Header() {
         <img className="logo-mark" src="/brand/whatupcoach-logo.svg" alt="" width={36} height={36} />
         <span>{site.shortName}</span>
       </Link>
-      <WhatsAppButton href={wa} small label="Empezar" />
+      <nav className="nav-links" aria-label="Secciones">
+        <a href="/#prueba">Cómo funciona</a>
+        <a href="/#precios">Precios</a>
+        <Link href="/panel/demo">Panel</Link>
+      </nav>
+      <WhatsAppButton href={wa} small label="Empezar gratis" />
     </header>
   );
 }
@@ -36,13 +41,24 @@ export function Footer() {
   );
 }
 
-export function WhatsAppButton({ href, label = "Empezar en WhatsApp", small = false }: { href: string | null; label?: string; small?: boolean }) {
-  const cls = `btn btn-primary${small ? " btn-sm" : ""}`;
+export function WhatsAppButton({
+  href,
+  label = "Empezar en WhatsApp",
+  small = false,
+  pulse = false,
+}: {
+  href: string | null;
+  label?: string;
+  small?: boolean;
+  pulse?: boolean;
+}) {
+  const cls = `btn btn-primary${small ? " btn-sm" : ""}${pulse ? " btn-pulse" : ""}`;
+  // Without a public number yet, the button still works: it shows the step-by-step demo.
   if (!href)
     return (
-      <span className={cls} aria-disabled="true" title="Muy pronto">
-        Muy pronto
-      </span>
+      <a className={cls} href="/#prueba">
+        <WhatsAppIcon /> {small ? "Ver demo" : "Ver la demo paso a paso"}
+      </a>
     );
   return (
     <a className={cls} href={href} target="_blank" rel="noopener noreferrer">
